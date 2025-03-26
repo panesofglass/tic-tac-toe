@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace TicTacToe.Web.Models;
 
 /// <summary>
@@ -24,10 +22,16 @@ public readonly struct Position
 {
     private readonly byte _value;
 
-    public Position(byte value)
+    public Position(byte position)
     {
-        Debug.Assert(value >= 0 && value <= 8, "Position must be between 0 and 8");
-        _value = value;
+        if (position > 8)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(position),
+                "Position must be between 0 and 8."
+            );
+        }
+        _value = position;
     }
 
     public byte Row => (byte)(_value / 3);
@@ -37,8 +41,17 @@ public readonly struct Position
 
     public static Position At(byte row, byte column)
     {
-        Debug.Assert(row <= 2, "Row must be between 0 and 2");
-        Debug.Assert(column <= 2, "Column must be between 0 and 2");
+        if (row > 2)
+        {
+            throw new ArgumentOutOfRangeException(nameof(row), "Row must be between 0 and 2.");
+        }
+        if (column > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(column),
+                "Column must be between 0 and 2."
+            );
+        }
         return new((byte)(row * 3 + column));
     }
 

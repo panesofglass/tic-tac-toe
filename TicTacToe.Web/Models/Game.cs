@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Diagnostics;
 
 namespace TicTacToe.Web.Models;
 
@@ -47,21 +46,31 @@ public record Game
     /// </summary>
     public static Game MakeMove(Game game, Position position)
     {
-        Debug.Assert(game is InProgress, "Game is already complete");
-        Debug.Assert(
-            GameBoard.IsAvailable(((InProgress)game).Board, position),
-            "The position is not available"
-        );
-        return game switch
+        if (game is not InProgress)
         {
-            Game.InProgress g when GameBoard.IsAvailable(g.Board, position) => FromMoves(
-                g.Moves.Add(Move.Create(position, g.CurrentPlayer))
-            ),
-            _ => throw new ArgumentOutOfRangeException(
+            throw new InvalidOperationException("Game is already complete.");
+        }
+
+        if (position < 0 || position > 8)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(position),
+                "Position must be between 0 and 8."
+            );
+        }
+        // Check if position is available
+        var inProgressGame = (InProgress)game;
+        if (!GameBoard.IsAvailable(inProgressGame.Board, position))
+        {
+            throw new ArgumentOutOfRangeException(
                 paramName: "position",
                 message: "The position is not available."
-            ),
-        };
+            );
+        }
+
+        return FromMoves(
+            inProgressGame.Moves.Add(Move.Create(position, inProgressGame.CurrentPlayer))
+        );
     }
 
     /// <summary>
@@ -92,6 +101,39 @@ public record Game
     public static Game FromMoves(IEnumerable<Move> moves)
     {
         var moveArray = moves.ToImmutableArray();
+
+        // Validate position values are in range
+        foreach (var move in moveArray)
+        {
+            if (move.Position < 0 || move.Position > 8)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(move.Position),
+                    "Position must be between 0 and 8."
+                );
+            }
+        }
+
+        // Validate no duplicate positions
+        var positions = moveArray.Select(m => (byte)m.Position).ToArray();
+        if (positions.Length != positions.Distinct().Count())
+        {
+            throw new ArgumentException("Position is already occupied.");
+        }
+
+        // Validate players alternate turns correctly
+        Marker expectedMarker = Marker.X;
+        foreach (var move in moveArray)
+        {
+            if (move.Marker != expectedMarker)
+            {
+                throw new ArgumentException(
+                    $"Players must alternate turns. Expected {expectedMarker} but got {move.Marker}."
+                );
+            }
+            expectedMarker = expectedMarker == Marker.X ? Marker.O : Marker.X;
+        }
+
         var board = GameBoard.FromMoves(moveArray);
         var currentPlayer = moveArray.Length % 2 == 0 ? Marker.X : Marker.O;
         if (HasWinner(board, Marker.X))

@@ -164,33 +164,42 @@ The game uses a simpler, more traditional server-rendered approach with these ma
 
 This simplified approach eliminates the need for separate API endpoints, as the server directly returns HTML fragments that data-star can use to update the page. The progressive enhancement approach ensures that only valid moves are possible by rendering click handlers with `data-on-click="@post"` only for empty cells.
 
-### File Structure
+### Project Structure
 
 ```
-tic-tac-toe/
-│
-├── public/             # Static assets
-│   ├── styles.css      # Game styling
-│   └── assets/         # Images, fonts, etc.
-│
-├── views/              # Server-rendered templates
-│   ├── layout.html     # Main page layout
-│   ├── index.html      # Landing page template listing all games
-│   ├── game.html       # Game board template
-│   └── components/     # Reusable HTML components
-│       ├── board.html  # Game board component
-│       ├── status.html # Game status component
-│       └── gameList.html # List of active games component
-│
-├── server.js           # Main server entry point
-├── game.js             # Game logic and state management
-├── routes.js           # Route handlers
-├── utils.js            # Utility functions
-│
-├── package.json        # Node.js dependencies and scripts
-├── .env                # Environment variables (gitignored)
-└── README.md           # Project documentation
+TicTacToe/
+├── TicTacToe.sln
+├── README.md
+├── conversation.md
+├── TicTacToe.Web/
+│   ├── Models/
+│   │   ├── Game.cs
+│   │   ├── GameBoard.cs
+│   │   └── Move.cs
+│   ├── Infrastructure/
+│   │   ├── IGameRepository.cs
+│   │   └── InMemoryGameRepository.cs
+│   ├── Program.cs
+│   ├── appsettings.json
+│   ├── appsettings.Development.json
+│   └── TicTacToe.Web.csproj
+└── TicTacToe.Tests/
+    ├── Models/
+    │   └── GameTests.cs
+    ├── Infrastructure/
+    │   └── InMemoryGameRepositoryTests.cs
+    └── TicTacToe.Tests.csproj
 ```
+
+The repository follows a clean architecture approach:
+
+- `TicTacToe.Web/`: Contains the web application and core game logic
+  - `Models/`: Domain models and game logic
+  - `Infrastructure/`: Data access and external service integrations
+  
+- `TicTacToe.Tests/`: Contains all test projects
+  - Mirrors the structure of the main project for easy navigation
+  - Each component has its corresponding test file
 
 ## Setup Instructions
 

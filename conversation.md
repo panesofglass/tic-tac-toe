@@ -743,3 +743,28 @@ Today we successfully implemented and tested the InMemoryGameRepository class, w
    - All 26 tests are now passing successfully
 
 The InMemoryGameRepository provides a solid foundation for our game's data storage layer, ensuring data consistency and proper handling of concurrent operations.
+
+### Why Version Tracking?
+
+The InMemoryGameRepository tracks both the Game object and a version number in its dictionary. This design decision supports optimistic concurrency control (OCC), which is crucial for handling concurrent updates without locks. Here's the rationale:
+
+Without version tracking:
+- If two players try to make moves simultaneously on the same game
+- Both would read the current game state
+- Both would make their moves and try to save
+- The second save would overwrite the first move, losing that player's action
+- This is known as the "lost update" problem
+
+With version tracking:
+- Each player gets both the game state AND its version number
+- When saving, they must provide the version they started with
+- If another player has made a move, the version won't match
+- The update is rejected (ConcurrencyException)
+- The player can then reload the latest state and retry their move
+
+The Game object itself doesn't contain this version information because:
+1. Version tracking is a persistence concern, not a domain concern
+2. The Game class focuses on game rules and state
+3. Different storage mechanisms might handle concurrency differently
+
+This separation keeps our domain model clean while ensuring data consistency at the repository level.

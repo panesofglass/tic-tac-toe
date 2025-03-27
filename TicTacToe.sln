@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TicTacToe.Web", "src\TicTac
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TicTacToe.Tests", "test\TicTacToe.Tests\TicTacToe.Tests.csproj", "{089A4817-49D9-4E04-A7F4-23945DEAD33E}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TicTacToe.Engine", "src\TicTacToe.Engine\TicTacToe.Engine.csproj", "{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,8 +45,23 @@ Global
 		{089A4817-49D9-4E04-A7F4-23945DEAD33E}.Release|x64.Build.0 = Release|Any CPU
 		{089A4817-49D9-4E04-A7F4-23945DEAD33E}.Release|x86.ActiveCfg = Release|Any CPU
 		{089A4817-49D9-4E04-A7F4-23945DEAD33E}.Release|x86.Build.0 = Release|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Debug|x64.Build.0 = Debug|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Debug|x86.Build.0 = Debug|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Release|x64.ActiveCfg = Release|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Release|x64.Build.0 = Release|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Release|x86.ActiveCfg = Release|Any CPU
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D8B4FEFB-9064-408C-A9C8-F8F08BD70605} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

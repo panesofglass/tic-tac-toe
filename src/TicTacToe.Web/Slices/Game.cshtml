@@ -1,9 +1,50 @@
-@inherits RazorSliceHttpResult<GameModel>
-@implements IUsesLayout<_Layout, LayoutModel>
+@inherits RazorSlice<GameModel>
 
-<div id="board" data-on-load="@@get('/game/@(Model.Id)')">Loading game...</div>
-<a href="/">Back to Games</a>
+<div>
+    <div id="board-@(Model.Id)" class="game-board" style="display: grid; grid-template-columns: repeat(3, 100px); gap: 2px;">
+        @for (byte row = 0; row < 3; row++)
+        {
+            @for (byte col = 0; col < 3; col++)
+            {
+                var position = Engine.Position.At(row, col);
+                var marker = Model.Board[position];
+                <div style="width: 100px; height: 100px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 2em;">
+                    @if (marker.HasValue)
+                    {
+                        @marker.Value.ToString()
+                    }
+                    else if (!Model.IsComplete)
+                    {
+                        <form method="post" action="/@Model.Id">
+                            <input type="hidden" name="Position.Row" value="@row" />
+                            <input type="hidden" name="Position.Column" value="@col" />
+                            <input type="hidden" name="Marker" value="@Model.CurrentPlayer" />
+                            <button type="submit" style="width: 100%; height: 100%; background: none; border: none; cursor: pointer;">
+                                &nbsp;
+                            </button>
+                        </form>
+                    }
+                </div>
+            }
+        }
+    </div>
 
-@functions {
-    public LayoutModel LayoutModel => new() { Title = $"Game {Model.Id}" };
-}
+    <div style="margin-top: 1em;">
+        @if (Model.IsComplete)
+        {
+            @if (Model.Winner.HasValue)
+            {
+                <p>Game Over! @Model.Winner.Value wins!</p>
+            }
+            else
+            {
+                <p>Game Over! It's a draw!</p>
+            }
+        }
+        else
+        {
+            <p>Current Player: @Model.CurrentPlayer</p>
+        }
+    </div>
+</div>
+

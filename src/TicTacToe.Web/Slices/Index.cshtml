@@ -1,7 +1,7 @@
 @inherits RazorSliceHttpResult<List<GameModel>>
 @implements IUsesLayout<_Layout, LayoutModel>
 
-<div id="list" data-on-load="@@get('/games')">Loading games...</div>
+@await RenderPartialAsync(GameList.Create(Model))
 
 @functions {
     public LayoutModel LayoutModel => new() { Title = "Home" };

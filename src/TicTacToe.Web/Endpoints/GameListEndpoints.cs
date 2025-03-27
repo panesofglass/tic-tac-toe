@@ -20,7 +20,7 @@ public static class GameListEndpoints
                 var model = games
                     .Select((game) => GameModel.FromGame(game.Item1, game.Item2))
                     .ToList();
-                var slice = Slices.Home.Create(model);
+                var slice = Slices.GameList.Create(model);
                 var fragment = await slice.RenderAsync();
                 await sse.MergeFragmentsAsync(fragment);
             }

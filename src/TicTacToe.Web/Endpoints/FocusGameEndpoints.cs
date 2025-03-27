@@ -1,12 +1,11 @@
-using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
 
 namespace TicTacToe.Web.Endpoints;
 
-public static class GamePageEndpoints
+public static class FocusGameEndpoints
 {
-    public static void MapGamePage(this IEndpointRouteBuilder endpoints)
+    public static void MapFocusGame(this IEndpointRouteBuilder endpoints)
     {
         // Game page HTML
         endpoints.MapGet(
@@ -15,7 +14,7 @@ public static class GamePageEndpoints
             {
                 var game = await gameRepository.GetGameAsync(id);
                 var model = GameModel.FromGame(id, game);
-                return Results.Extensions.RazorSlice<Slices.GameState, GameModel>(model);
+                return Results.Extensions.RazorSlice<Slices.FocusGame, GameModel>(model);
             }
         );
     }

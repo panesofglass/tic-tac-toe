@@ -20,8 +20,7 @@ app.UseStaticFiles();
 // Map endpoints
 app.MapHome();
 app.MapGameList();
-
-// app.MapGamePage();
-// app.MapGame();
+app.MapFocusGame();
+app.MapGame();
 
 app.Run();

@@ -4,6 +4,18 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <!-- BUG: Workaround for https://github.com/dotnet/runtime/issues/109958 -->
+    <NoWarn>IL3000</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+    <!-- Startup hooks are disabled when publishing aot/trimmed but are required for Hot Reload to work so enabling it here -->
+    <StartupHookSupport Condition="'$(Configuration)' == 'Debug'">true</StartupHookSupport>
+    <!--<PublishTrimmed>true</PublishTrimmed>-->
+    <!--<PublishSingleFile>true</PublishSingleFile>-->
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
   </PropertyGroup>
 
   <ItemGroup>

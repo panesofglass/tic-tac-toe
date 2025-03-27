@@ -1,0 +1,9 @@
+@inherits RazorSliceHttpResult<GameModel>
+@implements IUsesLayout<_Layout, LayoutModel>
+
+<div id="board" data-on-load="@@get('/game/@(Model.Id)')">Loading game...</div>
+<a href="/">Back to Games</a>
+
+@functions {
+    public LayoutModel LayoutModel => new() { Title = $"Game {Model.Id}" };
+}

@@ -1,0 +1,15 @@
+@inherits RazorSliceHttpResult
+
+@using System.Globalization
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Razor
+@using Microsoft.AspNetCore.Http.HttpResults
+@using RazorSlices
+
+@using TicTacToe.Web
+@using TicTacToe.Web.Slices
+@using Models = TicTacToe.Web.Models
+
+@tagHelperPrefix __disable_tagHelpers__:
+@removeTagHelper *, Microsoft.AspNetCore.Mvc.Razor
+

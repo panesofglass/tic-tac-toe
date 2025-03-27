@@ -1,0 +1,20 @@
+@inherits RazorSlice<List<GameModel>>
+
+<div>
+    <h2>Active Games</h2>
+    @if (!Model.Any())
+    {
+        <p>No active games. Start a new one!</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var game in Model)
+            {
+                <li><a href="/@(game.Id)">Game @(game.Id)</a></li>
+            }
+        </ul>
+    }
+    <button type="submit">Start New Game</button>
+</div>
+

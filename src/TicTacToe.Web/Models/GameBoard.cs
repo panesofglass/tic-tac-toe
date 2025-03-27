@@ -23,6 +23,11 @@ public record GameBoard
     public Marker? this[Position position] => _spaces[position];
 
     /// <summary>
+    /// Converts a GameBoard into an array.
+    /// </summary>
+    public Marker?[] ToArray() => _spaces.ToArray();
+
+    /// <summary>
     /// Returns true if the specified position is available for a move.
     /// </summary>
     public static bool IsAvailable(GameBoard board, Position position) =>

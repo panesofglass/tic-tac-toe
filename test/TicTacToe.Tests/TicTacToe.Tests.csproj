@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TicTacToe.Web\TicTacToe.Web.csproj" />
+    <ProjectReference Include="..\..\src\TicTacToe.Web\TicTacToe.Web.csproj" />
   </ItemGroup>
 
 </Project>

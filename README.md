@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project implements a classic Tic-Tac-Toe game using the data-star hypermedia framework. The goal is to demonstrate how interactive web applications can be built with minimal JavaScript by leveraging data-star's declarative data binding approach and server-rendering techniques.
+This project implements a classic Tic-Tac-Toe game using the datastar hypermedia framework. The goal is to demonstrate how interactive web applications can be built with minimal JavaScript by leveraging datastar's declarative data binding approach and server-rendering techniques.
 
 Tic-Tac-Toe is a simple two-player game where players take turns marking X or O on a 3x3 grid. The player who succeeds in placing three of their marks in a horizontal, vertical, or diagonal row wins the game.
 
@@ -36,7 +36,7 @@ The application relies on the following libraries and frameworks:
 
 ### Technical Requirements
 
-1. Use data-star.js (version 1.0.0-beta.10) as the primary framework
+1. Use datastar.js (version 1.0.0-beta.10) as the primary framework
 2. Implement the game using hypermedia principles with data-\* attributes
 3. Minimize or eliminate custom JavaScript code
 4. Ensure responsive design for different screen sizes
@@ -56,7 +56,7 @@ The application relies on the following libraries and frameworks:
 
 - **Game Listing**: Landing page displaying all active games
 - **Game Creation**: Ability to create new games from the landing page
-- **Interactive Game Board**: Empty cells rendered with data-star click handlers, taken cells rendered as static text
+- **Interactive Game Board**: Empty cells rendered with datastar click handlers, taken cells rendered as static text
 - **Turn Indicator**: Visual display showing which player's turn it is (X or O)
 - **Win Detection**: Automatic detection of win conditions
 - **Draw Detection**: Identify when the game ends in a draw
@@ -84,7 +84,7 @@ The application uses the following technology stack:
 
 ### Architecture
 
-The application follows a hypermedia-driven, server-rendered approach using data-star's declarative binding system and server-sent events for real-time updates:
+The application follows a hypermedia-driven, server-rendered approach using datastar's declarative binding system and server-sent events for real-time updates:
 
 1. **State Management**:
 
@@ -92,18 +92,18 @@ The application follows a hypermedia-driven, server-rendered approach using data
      - Board state (9 cells)
      - Current player
      - Game status
-   - Temporary client-side state is managed using data-star's reactive data system
+   - Temporary client-side state is managed using datastar's reactive data system
 
 2. **Interaction Flow**:
 
    - Server renders the initial game HTML via RazorSlices
    - data-\* attributes connect the UI to the application state
-   - User interactions trigger POST requests to the server via data-star directives
+   - User interactions trigger POST requests to the server via datastar directives
    - Server processes the request, updates game state, and checks game conditions
    - Server sends HTML updates to all connected clients via server-sent events
    - UI automatically updates to reflect state changes using the hypermedia fragments received
 
-3. **Key data-star Features Used**:
+3. **Key datastar Features Used**:
 
    - `data-state`: For maintaining client-side game state
    - `data-bind`: For updating the UI based on state changes
@@ -114,7 +114,7 @@ The application follows a hypermedia-driven, server-rendered approach using data
 
 4. **Progressive Enhancement**:
 
-   - Empty board spaces are rendered with data-star `data-on-click="@post('/game/:id')"` attributes
+   - Empty board spaces are rendered with datastar `data-on-click="@post('/game/:id')"` attributes
    - Taken board spaces are rendered as static text (X or O) without click handlers
    - This approach enforces move validation at the HTML structure level
    - No client-side prevention of clicks needed - invalid moves aren't possible by design
@@ -125,8 +125,8 @@ The application follows a hypermedia-driven, server-rendered approach using data
 
    - Real-time HTML updates pushed from server to connected clients
    - Updates include new board state, current player, and game status as HTML fragments
-   - Clients automatically update UI based on received events using data-star
-   - fetch-event-source (included in data-star) facilitates the connection to the event stream
+   - Clients automatically update UI based on received events using datastar
+   - fetch-event-source (included in datastar) facilitates the connection to the event stream
    - Ensures all players see the same game state
 
 6. **Game Logic**:
@@ -152,17 +152,35 @@ The application follows a hypermedia-driven, server-rendered approach using data
 
    - This approach is simpler than forms while maintaining the same server-side validation security model
 
-### Endpoints
+### API Design
 
-The game uses a simpler, more traditional server-rendered approach with these main endpoints:
+The application uses a fragment-based HTML-over-the-wire approach with the following routes:
 
-| Endpoint    | Method | Description                                                                           |
-| ----------- | ------ | ------------------------------------------------------------------------------------- |
-| `/`         | GET    | Renders the landing page with a list of active games and options to create a new game |
-| `/game/:id` | GET    | Renders the game page and establishes SSE connection for updates                      |
-| `/game/:id` | POST   | Submit a move or game action, returns updated HTML fragments                          |
+#### Full Page Routes
 
-This simplified approach eliminates the need for separate API endpoints, as the server directly returns HTML fragments that data-star can use to update the page. The progressive enhancement approach ensures that only valid moves are possible by rendering click handlers with `data-on-click="@post"` only for empty cells.
+- `GET /` - Landing page showing list of active games and option to create new game
+- `GET /:id` - Full game page for viewing and playing a specific game
+
+#### HTML Fragment Routes
+
+- `GET /page` - Returns HTML fragment for the games list and initiates SSE connection
+- `GET /page/:id` - Returns HTML fragment for a specific game and initiates SSE connection
+- `POST /page/:id` - Accepts a move for a specific game, triggers updates via SSE
+
+The fragment routes serve two purposes:
+
+1. Initial page rendering - The full page routes internally fetch fragments using datastar's `data-on-load` attribute
+2. Dynamic updates - The SSE connections established by GET requests to fragment routes push live updates
+
+#### Server-Sent Events
+
+- No separate endpoint is needed for SSE
+- The fragment routes (`/page` and `/page/:id`) establish SSE connections
+- Events use `datastar-merge-fragment` to seamlessly update the UI
+- POST requests trigger new events on the existing SSE connections
+
+This approach creates a clean separation between full pages and fragments, while leveraging datastar's capabilities to manage connections and updates. The progressive enhancement approach ensures that only valid moves are possible by rendering click handlers with `data-on-click="@post"` only for empty cells.
+This simplified approach eliminates the need for separate API endpoints, as the server directly returns HTML fragments that datastar can use to update the page. The progressive enhancement approach ensures that only valid moves are possible by rendering click handlers with `data-on-click="@post"` only for empty cells.
 
 ### Project Structure
 
@@ -171,24 +189,26 @@ TicTacToe/
 ├── TicTacToe.sln
 ├── README.md
 ├── conversation.md
-├── TicTacToe.Web/
-│   ├── Models/
-│   │   ├── Game.cs
-│   │   ├── GameBoard.cs
-│   │   └── Move.cs
-│   ├── Infrastructure/
-│   │   ├── IGameRepository.cs
-│   │   └── InMemoryGameRepository.cs
-│   ├── Program.cs
-│   ├── appsettings.json
-│   ├── appsettings.Development.json
-│   └── TicTacToe.Web.csproj
-└── TicTacToe.Tests/
-    ├── Models/
-    │   └── GameTests.cs
-    ├── Infrastructure/
-    │   └── InMemoryGameRepositoryTests.cs
-    └── TicTacToe.Tests.csproj
+├── src/
+│   └── TicTacToe.Web/
+│       ├── Models/
+│       │   ├── Game.cs
+│       │   ├── GameBoard.cs
+│       │   └── Move.cs
+│       ├── Infrastructure/
+│       │   ├── IGameRepository.cs
+│       │   └── InMemoryGameRepository.cs
+│       ├── Program.cs
+│       ├── appsettings.json
+│       ├── appsettings.Development.json
+│       └── TicTacToe.Web.csproj
+└── test/
+    └── TicTacToe.Tests/
+        ├── Models/
+        │   └── GameTests.cs
+        ├── Infrastructure/
+        │   └── InMemoryGameRepositoryTests.cs
+        └── TicTacToe.Tests.csproj
 ```
 
 The repository follows a clean architecture approach:
@@ -196,8 +216,7 @@ The repository follows a clean architecture approach:
 - `TicTacToe.Web/`: Contains the web application and core game logic
   - `Models/`: Domain models and game logic
   - `Infrastructure/`: Data access and external service integrations
-  
-- `TicTacToe.Tests/`: Contains all test projects
+- `TicTacToe.Tests/`: Contains all tests
   - Mirrors the structure of the main project for easy navigation
   - Each component has its corresponding test file
 
@@ -206,7 +225,7 @@ The repository follows a clean architecture approach:
 ### Prerequisites
 
 - A modern web browser (Chrome, Firefox, Safari, Edge)
-- Node.js (v16 or higher) and npm for the backend
+- dotnet 9.0 to build and run the server
 - Git for version control
 
 ### Installation
@@ -221,7 +240,7 @@ The repository follows a clean architecture approach:
 
    ```
    cd tic-tac-toe
-   npm install
+   dotnet restore
    ```
 
 3. Configure environment variables:
@@ -233,7 +252,7 @@ The repository follows a clean architecture approach:
 1. Start the server:
 
    ```
-   npm start
+   dotnet run --project src/TicTacToe.Web
    ```
 
    This will start the Node.js server, typically on port 3000 (configurable in .env).
@@ -246,34 +265,16 @@ The repository follows a clean architecture approach:
 
    This will show the landing page where you can see active games or create a new one.
 
-#### Development Mode
-
-1. For development with auto-reload:
-
-   ```
-   npm run dev
-   ```
-
-   This uses nodemon to automatically restart the server when changes are detected.
-
-### Development
-
-1. Edit template files in the `views/` directory to change the structure or data-star attributes
-2. Modify the `public/styles.css` file to adjust the visual appearance
-3. For game logic changes, update `game.js`
-4. For route handling changes, update `routes.js`
-5. The server will automatically restart if you're using development mode
-
 ### Testing
 
 Run the test suite to ensure everything is working correctly:
 
 ```
-npm test
+dotnet test
 ```
 
 This will run both backend unit tests and integration tests for the API endpoints.
 
 ---
 
-This project demonstrates how data-star's hypermedia approach combined with server-sent events can be used to create interactive, real-time web applications. The application follows a traditional server-rendered approach where HTML fragments are sent to the client and data-star uses its declarative data bindings to update the UI. By utilizing fetch-event-source for SSE connections, we create a responsive multiplayer experience with minimal client-side JavaScript and no separate API endpoints.
+This project demonstrates how datastar's hypermedia approach combined with server-sent events can be used to create interactive, real-time web applications. The application follows a traditional server-rendered approach where HTML fragments are sent to the client and datastar uses its declarative data bindings to update the UI. By utilizing fetch-event-source for SSE connections, we create a responsive multiplayer experience with minimal client-side JavaScript and no separate API endpoints.

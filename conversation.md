@@ -768,3 +768,31 @@ The Game object itself doesn't contain this version information because:
 3. Different storage mechanisms might handle concurrency differently
 
 This separation keeps our domain model clean while ensuring data consistency at the repository level.
+
+## March 26, 2025 - URL Structure Refinement
+
+### API Design
+
+The application uses a fragment-based HTML-over-the-wire approach with the following routes:
+
+#### Full Page Routes
+
+- `GET /` - Landing page showing list of active games and option to create new game
+- `GET /:id` - Full game page for viewing and playing a specific game
+
+#### HTML Fragment Routes
+
+- `GET /page` - Returns HTML fragment for the games list and initiates SSE connection
+- `GET /page/:id` - Returns HTML fragment for a specific game and initiates SSE connection
+- `POST /page/:id` - Accepts a move for a specific game, triggers updates via SSE
+
+The fragment routes serve two purposes:
+1. Initial page rendering - The full page routes internally fetch fragments using datastar's `data-on-load` attribute
+2. Dynamic updates - The SSE connections established by GET requests to fragment routes push live updates
+
+#### Server-Sent Events
+
+- No separate endpoint is needed for SSE
+- The fragment routes (`/page` and `/page/:id`) establish SSE connections
+- Events use `data-star-merge-fragment` to seamlessly update the UI
+- POST requests trigger new events on the existing SSE connections

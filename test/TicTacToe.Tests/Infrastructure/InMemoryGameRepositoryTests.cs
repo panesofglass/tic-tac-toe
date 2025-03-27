@@ -47,7 +47,7 @@ public class InMemoryGameRepositoryTests
     {
         // Arrange
         var (gameId, game) = await _repository.CreateGameAsync();
-        var updatedGame = Game.MakeMove(game, new Position(0));
+        var updatedGame = game.WithMove(Move.Create(new Position(0), Marker.X));
 
         // Act
         var result = await _repository.UpdateGameAsync(gameId, updatedGame);

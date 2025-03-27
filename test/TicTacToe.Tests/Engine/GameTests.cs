@@ -31,7 +31,7 @@ public class GameTests
         var game = Game.Create();
 
         // Act
-        var afterFirstMove = Game.MakeMove(game, new Position(0));
+        var afterFirstMove = game.WithMove(Move.Create(new Position(0), Marker.X));
 
         // Assert
         Assert.IsType<Game.InProgress>(afterFirstMove);
@@ -56,7 +56,7 @@ public class GameTests
         Assert.Equal(Marker.X, inProgressGame.Moves[0].Marker);
 
         // Make a second move
-        var afterSecondMove = Game.MakeMove(afterFirstMove, new Position(1));
+        var afterSecondMove = afterFirstMove.WithMove(Move.Create(new Position(1), Marker.O));
         Assert.IsType<Game.InProgress>(afterSecondMove);
         var afterSecondMoveGame = (Game.InProgress)afterSecondMove;
 
@@ -96,7 +96,7 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act - X makes winning move in position 2 (completing top row)
-        var gameAfterWinningMove = Game.MakeMove(game, new Position(2));
+        var gameAfterWinningMove = game.WithMove(Move.Create(new Position(2), Marker.X));
 
         // Assert
         Assert.IsType<Game.Winner>(gameAfterWinningMove);
@@ -119,7 +119,7 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act - X makes winning move in position 6 (completing left column)
-        var gameAfterWinningMove = Game.MakeMove(game, new Position(6));
+        var gameAfterWinningMove = game.WithMove(Move.Create(new Position(6), Marker.X));
 
         // Assert
         Assert.IsType<Game.Winner>(gameAfterWinningMove);
@@ -142,7 +142,7 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act - X makes winning move in position 8 (completing diagonal from top-left to bottom-right)
-        var gameAfterWinningMove = Game.MakeMove(game, new Position(8));
+        var gameAfterWinningMove = game.WithMove(Move.Create(new Position(8), Marker.X));
 
         // Assert
         Assert.IsType<Game.Winner>(gameAfterWinningMove);
@@ -166,7 +166,7 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act - O makes winning move in position 6 (completing diagonal from top-right to bottom-left)
-        var gameAfterWinningMove = Game.MakeMove(game, new Position(6));
+        var gameAfterWinningMove = game.WithMove(Move.Create(new Position(6), Marker.O));
 
         // Assert
         Assert.IsType<Game.Winner>(gameAfterWinningMove);
@@ -196,7 +196,7 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act - Last move by X in position 8 (bottom-right)
-        var gameAfterLastMove = Game.MakeMove(game, new Position(8));
+        var gameAfterLastMove = game.WithMove(Move.Create(new Position(8), Marker.X));
 
         // Assert
         Assert.IsType<Game.Draw>(gameAfterLastMove);
@@ -278,7 +278,7 @@ public class GameTests
         Assert.IsType<Game.InProgress>(game);
 
         // Act - X makes winning move
-        var gameAfterWinningMove = Game.MakeMove(game, new Position(2));
+        var gameAfterWinningMove = game.WithMove(Move.Create(new Position(2), Marker.X));
 
         // Assert - Game transitions to Winner state
         Assert.IsType<Game.Winner>(gameAfterWinningMove);
@@ -305,7 +305,7 @@ public class GameTests
         Assert.IsType<Game.InProgress>(game);
 
         // Act - Last move fills the board without a winner
-        var gameAfterLastMove = Game.MakeMove(game, new Position(8));
+        var gameAfterLastMove = game.WithMove(Move.Create(new Position(8), Marker.X));
 
         // Assert - Game transitions to Draw state
         Assert.IsType<Game.Draw>(gameAfterLastMove);
@@ -319,12 +319,11 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act & Assert
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => Game.MakeMove(game, new Position(0))
+        var exception = Assert.Throws<ArgumentException>(
+            () => game.WithMove(Move.Create(new Position(0), Marker.O))
         );
 
-        Assert.Contains("position", exception.ParamName);
-        Assert.Contains("The position is not available", exception.Message);
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
     }
 
     [Fact]
@@ -346,7 +345,7 @@ public class GameTests
 
         // Act & Assert
         var exception = Assert.Throws<InvalidOperationException>(
-            () => Game.MakeMove(game, new Position(6))
+            () => game.WithMove(Move.Create(new Position(6), Marker.O))
         );
 
         Assert.Contains("Game is already complete", exception.Message);
@@ -360,11 +359,10 @@ public class GameTests
 
         // Act & Assert
         var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => Game.MakeMove(game, new Position(9))
+            () => game.WithMove(Move.Create(new Position(9), Marker.X))
         );
 
-        Assert.Contains("position", exception.ParamName);
-        Assert.Contains("must be between 0 and 8", exception.Message);
+        Assert.Equal("Position must be between 0 and 8. (Parameter 'position')", exception.Message);
     }
 
     [Fact]
@@ -379,22 +377,21 @@ public class GameTests
 
         // Act & Assert
         var exception = Assert.Throws<ArgumentException>(() => Game.FromMoves(moves));
-        Assert.Contains("Players must alternate turns", exception.Message);
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
     }
 
     [Fact]
-    public void Given_InvalidPosition_When_CreatingGame_Then_ThrowsException()
+    public void Given_InvalidPosition_When_MakingMove_Then_ThrowsException()
     {
         // Arrange
         var game = Game.FromMoves(new[] { Move.Create(new Position(0), Marker.X) });
 
         // Act & Assert
         var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => Game.MakeMove(game, new Position(9))
+            () => game.WithMove(Move.Create(new Position(9), Marker.O))
         );
 
-        Assert.Contains("position", exception.ParamName);
-        Assert.Contains("Position must be between 0 and 8", exception.Message);
+        Assert.Equal("Position must be between 0 and 8. (Parameter 'position')", exception.Message);
     }
 
     [Fact]
@@ -410,7 +407,7 @@ public class GameTests
 
         // Act & Assert
         var exception = Assert.Throws<ArgumentException>(() => Game.FromMoves(moves));
-        Assert.Contains("Position is already occupied", exception.Message);
+        Assert.Equal("Position is already occupied.", exception.Message);
     }
 
     [Fact]
@@ -489,7 +486,7 @@ public class GameTests
         var game = Game.FromMoves(moves);
 
         // Act - X makes the winning move in bottom-right
-        var gameAfterLastMove = Game.MakeMove(game, new Position(8));
+        var gameAfterLastMove = game.WithMove(Move.Create(new Position(8), Marker.X));
 
         // Assert
         Assert.IsType<Game.Winner>(gameAfterLastMove);

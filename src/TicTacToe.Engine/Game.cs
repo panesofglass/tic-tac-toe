@@ -5,7 +5,7 @@ namespace TicTacToe.Engine;
 /// <summary>
 /// Represents a tic-tac-toe game, tracking board state and game status.
 /// </summary>
-public record Game
+public abstract record Game
 {
     private static readonly byte[][] WinningCombinations = new byte[][]
     {
@@ -40,39 +40,17 @@ public record Game
     /// <summary>
     /// Makes a move at the specified position for the current player.
     /// </summary>
-    public static Game MakeMove(Game game, Position position)
+    public Game WithMove(Move move)
     {
-        if (game is not InProgress)
+        if (this is not InProgress)
         {
             throw new InvalidOperationException("Game is already complete.");
         }
 
-        if (position < 0 || position > 8)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(position),
-                "Position must be between 0 and 8."
-            );
-        }
-        // Check if position is available
-        var inProgressGame = (InProgress)game;
-        if (!GameBoard.IsAvailable(inProgressGame.Board, position))
-        {
-            throw new ArgumentOutOfRangeException(
-                paramName: "position",
-                message: "The position is not available."
-            );
-        }
-
-        // Get the current player from the available space
-        var currentSquare = inProgressGame.Board[position];
-        if (currentSquare is not Square.Available availableSquare)
-        {
-            throw new InvalidOperationException("The position is not available.");
-        }
-        return FromMoves(
-            inProgressGame.Moves.Add(Move.Create(position, availableSquare.NextMarker))
-        );
+        var inProgressGame = (InProgress)this;
+        var nextBoard = inProgressGame.Board.WithMove(move);
+        var moves = inProgressGame.Moves.Add(move);
+        return FromBoard(nextBoard, moves);
     }
 
     /// <summary>
@@ -91,7 +69,7 @@ public record Game
     /// Returns true if all positions are filled and there is no winner.
     /// </summary>
     private static bool IsDraw(GameBoard board, ImmutableArray<Move> moves) =>
-        board.AsEnumerable().All(space => space is Square.Taken)
+        board.All(space => space is Square.Taken)
         && !HasWinner(board, Marker.X)
         && !HasWinner(board, Marker.O);
 
@@ -103,52 +81,10 @@ public record Game
     /// <summary>
     /// Creates a game from a sequence of moves.
     /// </summary>
-    public static Game FromMoves(IEnumerable<Move> moves)
+    public static Game FromBoard(GameBoard board, ImmutableArray<Move> moves)
     {
-        var moveArray = moves.ToImmutableArray();
-
-        // Validate position values are in range
-        foreach (var move in moveArray)
-        {
-            if (move.Position < 0 || move.Position > 8)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(move.Position),
-                    "Position must be between 0 and 8."
-                );
-            }
-        }
-
-        // Validate no duplicate positions
-        var positions = moveArray.Select(m => (byte)m.Position).ToArray();
-        if (positions.Length != positions.Distinct().Count())
-        {
-            throw new ArgumentException("Position is already occupied.");
-        }
-
         // Build board step by step to validate moves against board state
-        var board = GameBoard.Empty;
-
-        foreach (var move in moveArray)
-        {
-            // Verify this position is available
-            if (!GameBoard.IsAvailable(board, move.Position))
-            {
-                throw new ArgumentException("Position is already occupied.");
-            }
-
-            // Verify correct player is making the move
-            var space = board[move.Position];
-            if (space is Square.Available available && available.NextMarker != move.Marker)
-            {
-                throw new ArgumentException(
-                    $"Players must alternate turns. Expected {available.NextMarker} but got {move.Marker}."
-                );
-            }
-
-            // Apply the move
-            board = GameBoard.WithMove(board, move);
-        }
+        var moveArray = moves.ToImmutableArray();
 
         if (HasWinner(board, Marker.X))
             return new Winner(board, Marker.X, moveArray);
@@ -160,5 +96,34 @@ public record Game
             return new Draw(board, moveArray);
 
         return new Game.InProgress(board, moveArray);
+    }
+
+    /// <summary>
+    /// Creates a game from a sequence of moves.
+    /// </summary>
+    public static Game FromMoves(IEnumerable<Move> moves)
+    {
+        // Validate position values are in range
+        foreach (var move in moves)
+        {
+            if (move.Position < 0 || move.Position > 8)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(move.Position),
+                    "Position must be between 0 and 8."
+                );
+            }
+        }
+
+        // Validate no duplicate positions
+        var positions = moves.Select(m => (byte)m.Position).ToArray();
+        if (positions.Length != positions.Distinct().Count())
+        {
+            throw new ArgumentException("Position is already occupied.");
+        }
+
+        // Build board step by step to validate moves against board state
+        var board = moves.Aggregate(GameBoard.Empty, (board, move) => board.WithMove(move));
+        return FromBoard(board, moves.ToImmutableArray());
     }
 }

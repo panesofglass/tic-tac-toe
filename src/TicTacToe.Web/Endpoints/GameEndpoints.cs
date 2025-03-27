@@ -28,13 +28,15 @@ public static class GameEndpoints
             "game/{id}",
             async (
                 string id,
-                byte position,
+                MoveModel move,
                 IGameRepository repo,
                 IDatastarServerSentEventService sse
             ) =>
             {
                 var game = await repo.GetGameAsync(id);
-                var updatedGame = Game.MakeMove(game, new Position(position));
+                var updatedGame = game.WithMove(
+                    Move.Create(new Position(move.Position), move.Marker)
+                );
                 await repo.UpdateGameAsync(id, updatedGame);
                 var model = GameModel.FromGame(id, game);
                 var slice = Slices.Game.Create(model);

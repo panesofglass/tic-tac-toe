@@ -18,11 +18,11 @@ public record GameModel(
         };
 
     private static Marker?[] FromGameBoard(GameBoard board) =>
-        board.AsEnumerable().Select(FromSquare).ToArray();
+        board.Select(FromSquare).ToArray();
 
     private static Marker? FindCurrentPlayer(GameBoard board)
     {
-        var available = board.AsEnumerable().FirstOrDefault((space) => space is Square.Available);
+        var available = board.FirstOrDefault((space) => space is Square.Available);
         return available == null ? null : ((Square.Available)available).NextMarker;
     }
 

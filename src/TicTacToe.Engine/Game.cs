@@ -24,11 +24,7 @@ public record Game
     /// <summary>
     /// The game is still in progress.
     /// </summary>
-    public sealed record InProgress(
-        GameBoard Board,
-        Marker CurrentPlayer,
-        ImmutableArray<Move> Moves
-    ) : Game;
+    public sealed record InProgress(GameBoard Board, ImmutableArray<Move> Moves) : Game;
 
     /// <summary>
     /// The game has been won by a player.
@@ -68,8 +64,14 @@ public record Game
             );
         }
 
+        // Get the current player from the available space
+        var currentSquare = inProgressGame.Board[position];
+        if (currentSquare is not Square.Available availableSquare)
+        {
+            throw new InvalidOperationException("The position is not available.");
+        }
         return FromMoves(
-            inProgressGame.Moves.Add(Move.Create(position, inProgressGame.CurrentPlayer))
+            inProgressGame.Moves.Add(Move.Create(position, availableSquare.NextMarker))
         );
     }
 
@@ -79,7 +81,9 @@ public record Game
     private static bool HasWinner(GameBoard board, Marker marker)
     {
         return WinningCombinations.Any(combination =>
-            combination.All(position => board[new Position((byte)position)] == marker)
+            combination.All(position =>
+                board[new Position((byte)position)] is Square.Taken taken && taken.Marker == marker
+            )
         );
     }
 
@@ -87,13 +91,14 @@ public record Game
     /// Returns true if all positions are filled and there is no winner.
     /// </summary>
     private static bool IsDraw(GameBoard board, ImmutableArray<Move> moves) =>
-        moves.Length == 9 && !HasWinner(board, Marker.X) && !HasWinner(board, Marker.O);
+        board.AsEnumerable().All(space => space is Square.Taken)
+        && !HasWinner(board, Marker.X)
+        && !HasWinner(board, Marker.O);
 
     /// <summary>
     /// Creates a new game.
     /// </summary>
-    public static Game Create() =>
-        new Game.InProgress(GameBoard.Empty, Marker.X, ImmutableArray<Move>.Empty);
+    public static Game Create() => new Game.InProgress(GameBoard.Empty, ImmutableArray<Move>.Empty);
 
     /// <summary>
     /// Creates a game from a sequence of moves.
@@ -121,21 +126,30 @@ public record Game
             throw new ArgumentException("Position is already occupied.");
         }
 
-        // Validate players alternate turns correctly
-        Marker expectedMarker = Marker.X;
+        // Build board step by step to validate moves against board state
+        var board = GameBoard.Empty;
+
         foreach (var move in moveArray)
         {
-            if (move.Marker != expectedMarker)
+            // Verify this position is available
+            if (!GameBoard.IsAvailable(board, move.Position))
+            {
+                throw new ArgumentException("Position is already occupied.");
+            }
+
+            // Verify correct player is making the move
+            var space = board[move.Position];
+            if (space is Square.Available available && available.NextMarker != move.Marker)
             {
                 throw new ArgumentException(
-                    $"Players must alternate turns. Expected {expectedMarker} but got {move.Marker}."
+                    $"Players must alternate turns. Expected {available.NextMarker} but got {move.Marker}."
                 );
             }
-            expectedMarker = expectedMarker == Marker.X ? Marker.O : Marker.X;
+
+            // Apply the move
+            board = GameBoard.WithMove(board, move);
         }
 
-        var board = GameBoard.FromMoves(moveArray);
-        var currentPlayer = moveArray.Length % 2 == 0 ? Marker.X : Marker.O;
         if (HasWinner(board, Marker.X))
             return new Winner(board, Marker.X, moveArray);
 
@@ -145,6 +159,6 @@ public record Game
         if (IsDraw(board, moveArray))
             return new Draw(board, moveArray);
 
-        return new Game.InProgress(board, currentPlayer, moveArray);
+        return new Game.InProgress(board, moveArray);
     }
 }

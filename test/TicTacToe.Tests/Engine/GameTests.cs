@@ -5,7 +5,7 @@ namespace TicTacToe.Tests.Engine;
 public class GameTests
 {
     [Fact]
-    public void Given_NewGame_When_Created_Then_BoardIsEmptyAndXIsFirstPlayer()
+    public void Given_NewGame_When_Created_Then_BoardHasAllAvailableSpacesForXAsNextMarker()
     {
         // Arrange & Act
         var game = Game.Create();
@@ -13,18 +13,19 @@ public class GameTests
         // Assert
         Assert.IsType<Game.InProgress>(game);
         var inProgressGame = (Game.InProgress)game;
-        Assert.Equal(Marker.X, inProgressGame.CurrentPlayer);
         Assert.Empty(inProgressGame.Moves);
 
-        // Verify all positions are empty
+        // Verify all positions are available with X as the next marker
         for (byte i = 0; i < 9; i++)
         {
-            Assert.Null(inProgressGame.Board[new Position(i)]);
+            var spaceState = inProgressGame.Board[new Position(i)];
+            Assert.IsType<Square.Available>(spaceState);
+            Assert.Equal(Marker.X, ((Square.Available)spaceState).NextMarker);
         }
     }
 
     [Fact]
-    public void Given_NewGame_When_MakingValidMove_Then_MoveIsRecordedAndPlayerAlternates()
+    public void Given_NewGame_When_MakingValidMove_Then_MoveIsRecordedAndNextMarkerAlternates()
     {
         // Arrange
         var game = Game.Create();
@@ -37,10 +38,17 @@ public class GameTests
         var inProgressGame = (Game.InProgress)afterFirstMove;
 
         // Check the board has the marker at position 0
-        Assert.Equal(Marker.X, inProgressGame.Board[new Position(0)]);
+        var position0State = inProgressGame.Board[new Position(0)];
+        Assert.IsType<Square.Taken>(position0State);
+        Assert.Equal(Marker.X, ((Square.Taken)position0State).Marker);
 
-        // Check player has alternated to O
-        Assert.Equal(Marker.O, inProgressGame.CurrentPlayer);
+        // Check available spaces now have O as the next marker
+        for (byte i = 1; i < 9; i++)
+        {
+            var spaceState = inProgressGame.Board[new Position(i)];
+            Assert.IsType<Square.Available>(spaceState);
+            Assert.Equal(Marker.O, ((Square.Available)spaceState).NextMarker);
+        }
 
         // Check moves collection has the move
         Assert.Single(inProgressGame.Moves);
@@ -53,11 +61,21 @@ public class GameTests
         var afterSecondMoveGame = (Game.InProgress)afterSecondMove;
 
         // Check the board has both markers
-        Assert.Equal(Marker.X, afterSecondMoveGame.Board[new Position(0)]);
-        Assert.Equal(Marker.O, afterSecondMoveGame.Board[new Position(1)]);
+        var position0NewState = afterSecondMoveGame.Board[new Position(0)];
+        Assert.IsType<Square.Taken>(position0NewState);
+        Assert.Equal(Marker.X, ((Square.Taken)position0NewState).Marker);
 
-        // Check player has alternated back to X
-        Assert.Equal(Marker.X, afterSecondMoveGame.CurrentPlayer);
+        var position1State = afterSecondMoveGame.Board[new Position(1)];
+        Assert.IsType<Square.Taken>(position1State);
+        Assert.Equal(Marker.O, ((Square.Taken)position1State).Marker);
+
+        // Check available spaces now have X as the next marker
+        for (byte i = 2; i < 9; i++)
+        {
+            var spaceState = afterSecondMoveGame.Board[new Position(i)];
+            Assert.IsType<Square.Available>(spaceState);
+            Assert.Equal(Marker.X, ((Square.Available)spaceState).NextMarker);
+        }
 
         // Check moves collection has both moves
         Assert.Equal(2, afterSecondMoveGame.Moves.Length);
@@ -185,10 +203,10 @@ public class GameTests
         var drawGame = (Game.Draw)gameAfterLastMove;
         Assert.Equal(9, drawGame.Moves.Length);
 
-        // Verify all positions are filled
+        // Verify all positions are taken
         for (byte i = 0; i < 9; i++)
         {
-            Assert.NotNull(drawGame.Board[new Position(i)]);
+            Assert.IsType<Square.Taken>(drawGame.Board[new Position(i)]);
         }
     }
 
@@ -405,12 +423,13 @@ public class GameTests
         Assert.IsType<Game.InProgress>(game);
         var inProgressGame = (Game.InProgress)game;
         Assert.Empty(inProgressGame.Moves);
-        Assert.Equal(Marker.X, inProgressGame.CurrentPlayer);
 
-        // Verify all positions are empty
+        // Verify all positions are available with X as the next marker
         for (byte i = 0; i < 9; i++)
         {
-            Assert.Null(inProgressGame.Board[new Position(i)]);
+            var spaceState = inProgressGame.Board[new Position(i)];
+            Assert.IsType<Square.Available>(spaceState);
+            Assert.Equal(Marker.X, ((Square.Available)spaceState).NextMarker);
         }
     }
 
@@ -442,10 +461,10 @@ public class GameTests
         var drawGame = (Game.Draw)game;
         Assert.Equal(9, drawGame.Moves.Length);
 
-        // Verify all positions are filled
+        // Verify all positions are taken
         for (byte i = 0; i < 9; i++)
         {
-            Assert.NotNull(drawGame.Board[new Position(i)]);
+            Assert.IsType<Square.Taken>(drawGame.Board[new Position(i)]);
         }
     }
 

@@ -407,7 +407,7 @@ public class GameTests
 
         // Act & Assert
         var exception = Assert.Throws<ArgumentException>(() => Game.FromMoves(moves));
-        Assert.Equal("Position is already occupied.", exception.Message);
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
     }
 
     [Fact]

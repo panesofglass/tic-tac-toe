@@ -103,25 +103,6 @@ public abstract record Game
     /// </summary>
     public static Game FromMoves(IEnumerable<Move> moves)
     {
-        // Validate position values are in range
-        foreach (var move in moves)
-        {
-            if (move.Position < 0 || move.Position > 8)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(move.Position),
-                    "Position must be between 0 and 8."
-                );
-            }
-        }
-
-        // Validate no duplicate positions
-        var positions = moves.Select(m => (byte)m.Position).ToArray();
-        if (positions.Length != positions.Distinct().Count())
-        {
-            throw new ArgumentException("Position is already occupied.");
-        }
-
         // Build board step by step to validate moves against board state
         var board = moves.Aggregate(GameBoard.Empty, (board, move) => board.WithMove(move));
         return FromBoard(board, moves.ToImmutableArray());

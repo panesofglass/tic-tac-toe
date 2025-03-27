@@ -93,6 +93,7 @@ The application follows a hypermedia-driven, server-rendered approach using data
      - Current player
      - Game status
    - Temporary client-side state is managed using datastar's reactive data system
+   - Core game logic is encapsulated in the TicTacToe.Engine class library
 
 2. **Interaction Flow**:
 
@@ -154,7 +155,15 @@ The application follows a hypermedia-driven, server-rendered approach using data
 
 ### API Design
 
-The application uses a fragment-based HTML-over-the-wire approach with the following routes:
+The application uses a fragment-based HTML-over-the-wire approach with the following endpoint organization:
+
+#### Endpoint Organization
+
+The API endpoints are organized into the following groups:
+- **HomeEndpoints**: Handles the main landing page
+- **GameListEndpoints**: Manages the list of available games
+- **GameEndpoints**: Handles game-specific operations for viewing and playing
+- **FocusGameEndpoints**: Manages the focused game view and interactions
 
 #### Full Page Routes
 
@@ -190,21 +199,37 @@ TicTacToe/
 ├── README.md
 ├── conversation.md
 ├── src/
+│   ├── TicTacToe.Engine/
+│   │   ├── Game.cs
+│   │   ├── GameBoard.cs
+│   │   ├── Move.cs
+│   │   └── TicTacToe.Engine.csproj
 │   └── TicTacToe.Web/
-│       ├── Models/
-│       │   ├── Game.cs
-│       │   ├── GameBoard.cs
-│       │   └── Move.cs
+│       ├── Endpoints/
+│       │   ├── FocusGameEndpoints.cs
+│       │   ├── GameEndpoints.cs
+│       │   ├── GameListEndpoints.cs
+│       │   └── HomeEndpoints.cs
 │       ├── Infrastructure/
 │       │   ├── IGameRepository.cs
 │       │   └── InMemoryGameRepository.cs
+│       ├── Models/
+│       │   ├── GameModel.cs
+│       │   └── LayoutModel.cs
+│       ├── Slices/
+│       │   ├── FocusGame.cshtml
+│       │   ├── Game.cshtml
+│       │   ├── GameList.cshtml
+│       │   ├── Index.cshtml
+│       │   ├── _Layout.cshtml
+│       │   └── _ViewImports.cshtml
 │       ├── Program.cs
-│       ├── appsettings.json
 │       ├── appsettings.Development.json
+│       ├── appsettings.json
 │       └── TicTacToe.Web.csproj
 └── test/
     └── TicTacToe.Tests/
-        ├── Models/
+        ├── Engine/
         │   └── GameTests.cs
         ├── Infrastructure/
         │   └── InMemoryGameRepositoryTests.cs
@@ -213,11 +238,14 @@ TicTacToe/
 
 The repository follows a clean architecture approach:
 
-- `TicTacToe.Web/`: Contains the web application and core game logic
-  - `Models/`: Domain models and game logic
+- `TicTacToe.Engine/`: Contains the core game logic and domain models
+  - Includes Game, GameBoard, and Move models
+  - Encapsulates the game rules and state management
+- `TicTacToe.Web/`: Contains the web application and API endpoints
+  - `Endpoints/`: Organized API endpoints for different features
   - `Infrastructure/`: Data access and external service integrations
 - `TicTacToe.Tests/`: Contains all tests
-  - Mirrors the structure of the main project for easy navigation
+  - Mirrors the structure of the main projects for easy navigation
   - Each component has its corresponding test file
 
 ## Setup Instructions

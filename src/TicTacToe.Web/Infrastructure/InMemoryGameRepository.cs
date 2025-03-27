@@ -5,14 +5,14 @@ namespace TicTacToe.Web.Infrastructure;
 
 public class InMemoryGameRepository : IGameRepository
 {
-    private readonly ConcurrentDictionary<string, (Game Game, int Version)> _games = new();
+    private readonly ConcurrentDictionary<string, Game> _games = new();
 
     public Task<(string GameId, Game Game)> CreateGameAsync()
     {
         var gameId = Guid.NewGuid().ToString("N");
         var game = Game.Create();
 
-        if (!_games.TryAdd(gameId, (game, 0)))
+        if (!_games.TryAdd(gameId, game))
         {
             // This should never happen with a GUID, but we handle it anyway
             throw new InvalidOperationException("Failed to create game: ID collision");
@@ -23,30 +23,24 @@ public class InMemoryGameRepository : IGameRepository
 
     public Task<Game> GetGameAsync(string gameId)
     {
-        if (!_games.TryGetValue(gameId, out var gameEntry))
+        if (!_games.TryGetValue(gameId, out var game))
         {
             throw new GameNotFoundException(gameId);
         }
 
-        return Task.FromResult(gameEntry.Game);
+        return Task.FromResult(game);
     }
 
-    public Task<Game> UpdateGameAsync(string gameId, Game game, int expectedVersion)
+    public Task<Game> UpdateGameAsync(string gameId, Game game)
     {
         if (!_games.TryGetValue(gameId, out var currentEntry))
         {
             throw new GameNotFoundException(gameId);
         }
 
-        if (currentEntry.Version != expectedVersion)
-        {
-            throw new ConcurrencyException(gameId);
-        }
-
-        var newEntry = (Game: game, Version: expectedVersion + 1);
         var oldEntry = currentEntry;
 
-        if (!_games.TryUpdate(gameId, newEntry, oldEntry))
+        if (!_games.TryUpdate(gameId, game, oldEntry))
         {
             throw new ConcurrencyException(gameId);
         }

@@ -15,8 +15,8 @@ public class InMemoryGameRepositoryTests
     [Fact]
     public async Task CreateGame_Returns_UniqueIds()
     {
-        var (gameId1, _) = await _repository.CreateGameAsync();
-        var (gameId2, _) = await _repository.CreateGameAsync();
+        var gameId1 = await _repository.CreateGameAsync();
+        var gameId2 = await _repository.CreateGameAsync();
 
         Assert.NotEqual(gameId1, gameId2);
     }
@@ -50,25 +50,12 @@ public class InMemoryGameRepositoryTests
         var updatedGame = Game.MakeMove(game, new Position(0));
 
         // Act
-        var result = await _repository.UpdateGameAsync(gameId, updatedGame, expectedVersion: 0);
+        var result = await _repository.UpdateGameAsync(gameId, updatedGame);
 
         // Assert
         Assert.Equal(updatedGame, result);
         var stored = await _repository.GetGameAsync(gameId);
         Assert.Equal(updatedGame, stored);
-    }
-
-    [Fact]
-    public async Task UpdateGame_ThrowsConcurrencyException_WhenVersionMismatch()
-    {
-        // Arrange
-        var (gameId, game) = await _repository.CreateGameAsync();
-        var updatedGame = Game.MakeMove(game, new Position(0));
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ConcurrencyException>(
-            () => _repository.UpdateGameAsync(gameId, updatedGame, expectedVersion: 2)
-        );
     }
 
     [Fact]

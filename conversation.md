@@ -1,27 +1,3 @@
-## March 26, 2025 - Project Restructuring
-
-Today, we've completed several important organizational tasks:
-
-1. Project Structure Improvement:
-   - Moved project files into standard src/ and test/ directories
-   - Updated solution file to reflect new structure
-   - Organized Models and Infrastructure components
-
-2. Documentation Updates:
-   - Added clear version tracking of dependencies in README:
-     * RazorSlices 0.9.1
-     * StarFederation.Datastar 1.0.0-beta.4
-     * datastar.js 1.0.0-beta.10
-   - Added detailed API design documentation
-   - Updated project structure documentation
-
-The project is now well-organized with completed implementations of:
-- Core domain models (Move, Game, GameBoard)
-- Data access layer (IGameRepository, InMemoryGameRepository)
-- Comprehensive test coverage
-
-Next steps will focus on implementing the web interface and game play logic using our hypermedia-driven approach.
-
 # Tic-Tac-Toe Project Development Log
 
 ## Context
@@ -58,14 +34,15 @@ The application follows server-side rendering principles with real-time updates 
 
 ### Technical Requirements Status
 
-- [-] Hypermedia implementation with data-\* attributes
+- [x] Hypermedia implementation with data-\* attributes
 - [ ] Minimal JavaScript approach
 - [ ] Responsive design
 - [ ] Clean HTML structure
-- [-] Server-side game state management
-- [ ] Server-rendered HTML and SSE updates
-- [ ] Concurrent game sessions
-- [-] Server-side move validation
+- [x] Server-side game state management
+- [ ] Server-rendered HTML
+- [ ] SSE updates
+- [x] Concurrent game sessions
+- [x] Server-side move validation
 - [ ] Game persistence
 - [ ] Error handling and logging
 
@@ -80,8 +57,8 @@ The application follows server-side rendering principles with real-time updates 
 - Project setup
   - Initialized Git repository
   - Added .gitignore for .NET project
-  - Created Web (TicTacToe.Web) and Test (TicTacToe.Tests) projects
-- Models
+  - Created Engine (TicTacToe.Engine), Web (TicTacToe.Web), and Test (TicTacToe.Tests) projects
+- Engine
   - Move record with Position and Timestamp
   - Position record with row/column validation (0-2)
   - Marker enum (X/O)
@@ -681,7 +658,9 @@ I'll regenerate the diff using byte for the Row and Column properties and add as
 ## Implementation Progress
 
 ### Completed
+
 1. **Core Game Model**
+
    - Implemented game state management and validation in `Game.cs`
    - Created board representation and win detection in `GameBoard.cs`
    - Added move validation and representation in `Move.cs`
@@ -689,15 +668,16 @@ I'll regenerate the diff using byte for the Row and Column properties and add as
 2. **Test Coverage**
    - Implemented comprehensive test suite in `GameTests.cs`
    - 20 passing tests covering:
-     * Invalid move validation
-     * Turn alternation (X/O)
-     * Win detection (horizontal, vertical, diagonal)
-     * Game state transitions
-     * Move sequence validation
+     - Invalid move validation
+     - Turn alternation (X/O)
+     - Win detection (horizontal, vertical, diagonal)
+     - Game state transitions
+     - Move sequence validation
 
 ### Next Steps: Game Storage and Persistence
 
 1. **Game Repository Pattern**
+
    ```csharp
    public interface IGameRepository
    {
@@ -709,11 +689,13 @@ I'll regenerate the diff using byte for the Row and Column properties and add as
    ```
 
 2. **In-Memory Implementation**
+
    - Use `ConcurrentDictionary<string, Game>` for thread-safe storage
    - Implement optimistic concurrency with version numbers
    - Add atomic game state updates
 
 3. **Game Session Management**
+
    ```csharp
    public class GameSession
    {
@@ -732,7 +714,9 @@ I'll regenerate the diff using byte for the Row and Column properties and add as
    - Activity tracking for game sessions
 
 ### Future Considerations
+
 1. **Persistence Layer**
+
    - Database schema design
    - Migration from in-memory to persistent storage
    - Backup and recovery strategies
@@ -747,51 +731,22 @@ I'll regenerate the diff using byte for the Row and Column properties and add as
 Today we successfully implemented and tested the InMemoryGameRepository class, which provides an in-memory storage solution for our Tic-tac-toe game. Key achievements include:
 
 1. Created a complete implementation of IGameRepository interface with the following methods:
+
    - CreateGameAsync: Creates a new game with a unique ID
    - GetGameAsync: Retrieves a game by ID
    - UpdateGameAsync: Updates a game with optimistic concurrency
    - DeleteGameAsync: Removes a game from storage
 
-2. Implemented proper optimistic concurrency control:
-   - Games are created with an initial version of 0
-   - Updates require the correct version number
-   - Concurrent updates are properly detected and rejected
-
-3. Added comprehensive test coverage:
+2. Added comprehensive test coverage:
    - Verified unique game ID generation
    - Tested game retrieval and updates
    - Validated proper error handling for:
-     * Game not found scenarios
-     * Concurrency conflicts
-     * Version mismatches
+     - Game not found scenarios
+     - Concurrency conflicts
+     - Version mismatches
    - All 26 tests are now passing successfully
 
 The InMemoryGameRepository provides a solid foundation for our game's data storage layer, ensuring data consistency and proper handling of concurrent operations.
-
-### Why Version Tracking?
-
-The InMemoryGameRepository tracks both the Game object and a version number in its dictionary. This design decision supports optimistic concurrency control (OCC), which is crucial for handling concurrent updates without locks. Here's the rationale:
-
-Without version tracking:
-- If two players try to make moves simultaneously on the same game
-- Both would read the current game state
-- Both would make their moves and try to save
-- The second save would overwrite the first move, losing that player's action
-- This is known as the "lost update" problem
-
-With version tracking:
-- Each player gets both the game state AND its version number
-- When saving, they must provide the version they started with
-- If another player has made a move, the version won't match
-- The update is rejected (ConcurrencyException)
-- The player can then reload the latest state and retry their move
-
-The Game object itself doesn't contain this version information because:
-1. Version tracking is a persistence concern, not a domain concern
-2. The Game class focuses on game rules and state
-3. Different storage mechanisms might handle concurrency differently
-
-This separation keeps our domain model clean while ensuring data consistency at the repository level.
 
 ## March 26, 2025 - URL Structure Refinement
 
@@ -811,6 +766,7 @@ The application uses a fragment-based HTML-over-the-wire approach with the follo
 - `POST /page/:id` - Accepts a move for a specific game, triggers updates via SSE
 
 The fragment routes serve two purposes:
+
 1. Initial page rendering - The full page routes internally fetch fragments using datastar's `data-on-load` attribute
 2. Dynamic updates - The SSE connections established by GET requests to fragment routes push live updates
 

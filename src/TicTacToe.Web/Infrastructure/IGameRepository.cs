@@ -20,7 +20,7 @@ public interface IGameRepository
     /// </summary>
     /// <exception cref="GameNotFoundException">Thrown when the game doesn't exist</exception>
     /// <exception cref="ConcurrencyException">Thrown when the game has been modified by another operation</exception>
-    Task<Game> UpdateGameAsync(string gameId, Game game, int expectedVersion);
+    Task<Game> UpdateGameAsync(string gameId, Game game);
 
     /// <summary>
     /// Deletes a game by its identifier

@@ -35,7 +35,7 @@ public static class GameEndpoints
             {
                 var game = await repo.GetGameAsync(id);
                 var updatedGame = Game.MakeMove(game, new Position(position));
-                await repo.UpdateGameAsync(id, updatedGame, 0); // TODO: Handle version correctly
+                await repo.UpdateGameAsync(id, updatedGame);
                 var model = GameModel.FromGame(id, game);
                 var slice = Slices.Game.Create(model);
                 var fragment = await slice.RenderAsync();

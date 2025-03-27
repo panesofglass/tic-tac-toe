@@ -1,5 +1,5 @@
 using TicTacToe.Engine;
-
+using System.Collections.Immutable;
 namespace TicTacToe.Tests.Engine;
 
 public class GameTests
@@ -493,5 +493,416 @@ public class GameTests
         var winnerGame = (Game.Winner)gameAfterLastMove;
         Assert.Equal(Marker.X, winnerGame.WinningPlayer);
         Assert.Equal(9, winnerGame.Moves.Length);
+    }
+
+    [Fact]
+    public void Given_NullMoves_When_CreatingGame_Then_ThrowsException()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => Game.FromMoves(null!));
+    }
+
+    [Fact]
+    public void Given_OStartsFirst_When_CreatingGame_Then_ThrowsException()
+    {
+        // Arrange
+        var moves = new[] { Move.Create(new Position(0), Marker.O) };
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => Game.FromMoves(moves));
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
+    }
+
+    [Fact]
+    public void Given_Position_When_CreatingFromRowAndColumn_Then_CalculatesCorrectly()
+    {
+        // Test all positions
+        for (byte row = 0; row < 3; row++)
+        {
+            for (byte col = 0; col < 3; col++)
+            {
+                var position = Position.At(row, col);
+                byte expectedIndex = (byte)(row * 3 + col);
+
+                Assert.Equal(row, position.Row);
+                Assert.Equal(col, position.Column);
+                Assert.Equal(expectedIndex, (byte)position);
+            }
+        }
+    }
+
+    [Fact]
+    public void Given_Position_When_Converting_Then_MaintainsValue()
+    {
+        for (byte i = 0; i < 9; i++)
+        {
+            var position = new Position(i);
+            byte value = position;
+            var converted = (Position)value;
+
+            Assert.Equal(position.Row, converted.Row);
+            Assert.Equal(position.Column, converted.Column);
+            Assert.Equal((byte)position, (byte)converted);
+        }
+    }
+
+    [Fact]
+    public void Given_InvalidRowOrColumn_When_CreatingPosition_Then_ThrowsException()
+    {
+        // Row too high
+        Assert.Throws<ArgumentOutOfRangeException>(() => Position.At(3, 0));
+
+        // Column too high
+        Assert.Throws<ArgumentOutOfRangeException>(() => Position.At(0, 3));
+
+        // Both too high
+        Assert.Throws<ArgumentOutOfRangeException>(() => Position.At(3, 3));
+    }
+
+    [Fact]
+    public void Given_WrongPlayerTurn_When_MakingMove_Then_ThrowsException()
+    {
+        // Arrange - Game where X just moved
+        var game = Game.FromMoves(new[] { Move.Create(new Position(0), Marker.X) });
+
+        // Act & Assert - X tries to move again
+        var exception = Assert.Throws<ArgumentException>(
+            () => game.WithMove(Move.Create(new Position(1), Marker.X))
+        );
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
+    }
+
+    [Fact]
+    public void Given_GameInDraw_When_MakingMove_Then_ThrowsException()
+    {
+        // Arrange - Create a draw game
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(1), Marker.O),
+            Move.Create(new Position(2), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(3), Marker.X),
+            Move.Create(new Position(5), Marker.O),
+            Move.Create(new Position(7), Marker.X),
+            Move.Create(new Position(6), Marker.O),
+            Move.Create(new Position(8), Marker.X),
+        };
+        var game = Game.FromMoves(moves);
+
+        // Verify game is in draw
+        Assert.IsType<Game.Draw>(game);
+
+        // Act & Assert
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => game.WithMove(Move.Create(new Position(0), Marker.O))
+        );
+        Assert.Contains("Game is already complete", exception.Message);
+    }
+
+    [Fact]
+    public void Given_MinimalMoves_When_WinningMove_Then_GameStateBecomesWinner()
+    {
+        // Arrange - Minimum moves needed for X to win (5 total moves)
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X), // X top-left
+            Move.Create(new Position(3), Marker.O), // O middle-left
+            Move.Create(new Position(1), Marker.X), // X top-middle
+            Move.Create(new Position(4), Marker.O), // O middle-middle
+        };
+        var game = Game.FromMoves(moves);
+
+        // Act - X makes winning move to complete top row
+        var gameAfterWin = game.WithMove(Move.Create(new Position(2), Marker.X));
+
+        // Assert
+        Assert.IsType<Game.Winner>(gameAfterWin);
+        var winner = (Game.Winner)gameAfterWin;
+        Assert.Equal(Marker.X, winner.WinningPlayer);
+        Assert.Equal(5, winner.Moves.Length); // Verify minimum moves
+    }
+
+    [Fact]
+    public void Given_TooManyMoves_When_CreatingGame_Then_ThrowsException()
+    {
+        // Arrange - 10 moves (more than 9 allowed positions)
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(1), Marker.O),
+            Move.Create(new Position(2), Marker.X),
+            Move.Create(new Position(3), Marker.O),
+            Move.Create(new Position(4), Marker.X),
+            Move.Create(new Position(5), Marker.O),
+            Move.Create(new Position(6), Marker.X),
+            Move.Create(new Position(7), Marker.O),
+            Move.Create(new Position(8), Marker.X),
+            Move.Create(new Position(0), Marker.O), // Extra move
+        };
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => Game.FromMoves(moves));
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
+    }
+
+    [Fact]
+    public void Given_MirrorDiagonalWin_When_WinningMove_Then_GameStateBecomesWinner()
+    {
+        // Arrange - Setting up a diagonal win from top-right to bottom-left
+        var moves = new[]
+        {
+            Move.Create(new Position(2), Marker.X), // X top-right
+            Move.Create(new Position(0), Marker.O), // O top-left
+            Move.Create(new Position(4), Marker.X), // X middle-middle
+            Move.Create(new Position(1), Marker.O), // O top-middle
+        };
+        var game = Game.FromMoves(moves);
+
+        // Act - X completes diagonal
+        var gameAfterWin = game.WithMove(Move.Create(new Position(6), Marker.X));
+
+        // Assert
+        Assert.IsType<Game.Winner>(gameAfterWin);
+        var winner = (Game.Winner)gameAfterWin;
+        Assert.Equal(Marker.X, winner.WinningPlayer);
+    }
+
+    [Fact]
+    public void Given_GameBoard_When_AllSpacesAvailable_Then_TracksNextMarkerCorrectly()
+    {
+        // Arrange
+        var game = Game.Create();
+        var inProgressGame = (Game.InProgress)game;
+
+        // Assert - All spaces should be available with X as next marker
+        for (byte i = 0; i < 9; i++)
+        {
+            var space = inProgressGame.Board[new Position(i)];
+            Assert.IsType<Square.Available>(space);
+            Assert.Equal(Marker.X, ((Square.Available)space).NextMarker);
+        }
+
+        // Act - Make a move
+        var afterMove = game.WithMove(Move.Create(new Position(0), Marker.X));
+        var afterMoveGame = (Game.InProgress)afterMove;
+
+        // Assert - All remaining spaces should show O as next marker
+        for (byte i = 1; i < 9; i++)
+        {
+            var space = afterMoveGame.Board[new Position(i)];
+            Assert.IsType<Square.Available>(space);
+            Assert.Equal(Marker.O, ((Square.Available)space).NextMarker);
+        }
+    }
+
+    [Fact]
+    public void Given_SameBoard_When_CreatingGameDifferentWays_Then_ResultsAreEquivalent()
+    {
+        // Arrange - Create a sequence of moves
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(1), Marker.X),
+        };
+
+        // Act - Create games two different ways
+        var gameFromMoves = Game.FromMoves(moves);
+        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
+        var gameFromBoard = Game.FromBoard(board, moves.ToImmutableArray());
+
+        // Assert
+        Assert.IsType<Game.InProgress>(gameFromMoves);
+        Assert.IsType<Game.InProgress>(gameFromBoard);
+        
+        var inProgressFromMoves = (Game.InProgress)gameFromMoves;
+        var inProgressFromBoard = (Game.InProgress)gameFromBoard;
+
+        // Compare moves
+        Assert.Equal(inProgressFromMoves.Moves.Length, inProgressFromBoard.Moves.Length);
+        for (int i = 0; i < moves.Length; i++)
+        {
+            Assert.Equal(inProgressFromMoves.Moves[i].Position, inProgressFromBoard.Moves[i].Position);
+            Assert.Equal(inProgressFromMoves.Moves[i].Marker, inProgressFromBoard.Moves[i].Marker);
+        }
+
+        // Compare board states
+        for (byte i = 0; i < 9; i++)
+        {
+            var pos = new Position(i);
+            Assert.Equal(
+                inProgressFromMoves.Board[pos].GetType(),
+                inProgressFromBoard.Board[pos].GetType()
+            );
+            if (inProgressFromMoves.Board[pos] is Square.Taken taken1 &&
+                inProgressFromBoard.Board[pos] is Square.Taken taken2)
+            {
+                Assert.Equal(taken1.Marker, taken2.Marker);
+            }
+            else if (inProgressFromMoves.Board[pos] is Square.Available available1 &&
+                     inProgressFromBoard.Board[pos] is Square.Available available2)
+            {
+                Assert.Equal(available1.NextMarker, available2.NextMarker);
+            }
+        }
+    }
+
+    [Fact]
+    public void Given_BoardWithWinner_When_CreatingGame_Then_TransitionsToWinnerState()
+    {
+        // Arrange - Create a winning board directly
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(3), Marker.O),
+            Move.Create(new Position(1), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(2), Marker.X),
+        };
+        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
+
+        // Act
+        var game = Game.FromBoard(board, moves.ToImmutableArray());
+
+        // Assert
+        Assert.IsType<Game.Winner>(game);
+        var winner = (Game.Winner)game;
+        Assert.Equal(Marker.X, winner.WinningPlayer);
+        Assert.Equal(moves.Length, winner.Moves.Length);
+    }
+
+    [Fact]
+    public void Given_BoardInProgress_When_MakingWinningMove_Then_TransitionsToWinner()
+    {
+        // Arrange - Set up a board one move away from winning
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(3), Marker.O),
+            Move.Create(new Position(1), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+        };
+        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
+        var game = Game.FromBoard(board, moves.ToImmutableArray());
+
+        // Verify game is in progress
+        Assert.IsType<Game.InProgress>(game);
+
+        // Act - Make winning move
+        var afterMove = game.WithMove(Move.Create(new Position(2), Marker.X));
+
+        // Assert
+        Assert.IsType<Game.Winner>(afterMove);
+        var winner = (Game.Winner)afterMove;
+        Assert.Equal(Marker.X, winner.WinningPlayer);
+        Assert.Equal(moves.Length + 1, winner.Moves.Length);
+    }
+
+    [Fact]
+    public void Given_BoardInProgress_When_MakingDrawMove_Then_TransitionsToDraw()
+    {
+        // Arrange - Set up a board one move away from draw
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(1), Marker.O),
+            Move.Create(new Position(2), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(3), Marker.X),
+            Move.Create(new Position(5), Marker.O),
+            Move.Create(new Position(7), Marker.X),
+            Move.Create(new Position(6), Marker.O),
+        };
+        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
+        var game = Game.FromBoard(board, moves.ToImmutableArray());
+
+        // Verify game is in progress
+        Assert.IsType<Game.InProgress>(game);
+
+        // Act - Make final move leading to draw
+        var afterMove = game.WithMove(Move.Create(new Position(8), Marker.X));
+
+        // Assert
+        Assert.IsType<Game.Draw>(afterMove);
+        var draw = (Game.Draw)afterMove;
+        Assert.Equal(9, draw.Moves.Length);
+
+        // Verify all positions are taken
+        for (byte i = 0; i < 9; i++)
+        {
+            Assert.IsType<Square.Taken>(draw.Board[new Position(i)]);
+        }
+    }
+
+    [Fact]
+    public void Given_Move_When_Creating_Then_SetsTimestamp()
+    {
+        // Arrange & Act
+        var move = Move.Create(new Position(0), Marker.X);
+
+        // Assert - Verify timestamp is recent
+        var timeDiff = DateTimeOffset.UtcNow - move.Timestamp;
+        Assert.True(timeDiff.TotalSeconds < 1);
+        Assert.True(move.Timestamp.Offset == TimeSpan.Zero); // Ensure UTC
+    }
+
+    [Fact]
+    public void Given_ValidPosition_When_CreatingMove_Then_SetsPosition()
+    {
+        // Arrange & Act
+        var position = new Position(4); // Center position
+        var move = Move.Create(position, Marker.X);
+
+        // Assert
+        Assert.Equal(position, move.Position);
+    }
+
+    [Fact]
+    public void Given_ValidMoves_When_CreatingFromMoves_Then_CreatesBoard()
+    {
+        // Arrange
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(8), Marker.X),
+        };
+
+        // Act
+        var board = GameBoard.FromMoves(moves);
+
+        // Assert - Check specific positions
+        Assert.IsType<Square.Taken>(board[new Position(0)]);
+        Assert.Equal(Marker.X, ((Square.Taken)board[new Position(0)]).Marker);
+        Assert.IsType<Square.Taken>(board[new Position(4)]);
+        Assert.Equal(Marker.O, ((Square.Taken)board[new Position(4)]).Marker);
+        Assert.IsType<Square.Taken>(board[new Position(8)]);
+        Assert.Equal(Marker.X, ((Square.Taken)board[new Position(8)]).Marker);
+
+        // Check that remaining positions are available with O as next marker
+        for (byte i = 1; i < 8; i++)
+        {
+            if (i != 4)
+            {
+                Assert.IsType<Square.Available>(board[new Position(i)]);
+                Assert.Equal(Marker.O, ((Square.Available)board[new Position(i)]).NextMarker);
+            }
+        }
+    }
+
+    [Fact]
+    public void Given_InvalidMoveSequence_When_FromMoves_Then_ThrowsException()
+    {
+        // Arrange - Moves with an invalid sequence (O tries to start)
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.O),
+            Move.Create(new Position(4), Marker.X),
+        };
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => GameBoard.FromMoves(moves));
+        Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
     }
 }

@@ -24,3 +24,5 @@ app.MapFocusGame();
 app.MapGame();
 
 app.Run();
+
+public partial class Program { }

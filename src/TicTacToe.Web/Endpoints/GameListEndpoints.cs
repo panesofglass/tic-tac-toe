@@ -1,5 +1,6 @@
 using RazorSlices;
 using StarFederation.Datastar.DependencyInjection;
+using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
 
@@ -17,7 +18,7 @@ public static class GameListEndpoints
                 // var games = await repo.GetGamesAsync();
                 var games = new List<(string, Game)>();
                 var model = games
-                    .Select((game) => Slices.GameModel.FromGame(game.Item1, game.Item2))
+                    .Select((game) => GameModel.FromGame(game.Item1, game.Item2))
                     .ToList();
                 var slice = Slices.Home.Create(model);
                 var fragment = await slice.RenderAsync();

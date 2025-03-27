@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using TicTacToe.Web.Models;
+using TicTacToe.Engine;
 
 namespace TicTacToe.Web.Infrastructure;
 
@@ -11,7 +11,7 @@ public class InMemoryGameRepository : IGameRepository
     {
         var gameId = Guid.NewGuid().ToString("N");
         var game = Game.Create();
-        
+
         if (!_games.TryAdd(gameId, (game, 0)))
         {
             // This should never happen with a GUID, but we handle it anyway
@@ -60,4 +60,3 @@ public class InMemoryGameRepository : IGameRepository
         return Task.CompletedTask;
     }
 }
-

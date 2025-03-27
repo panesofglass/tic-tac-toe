@@ -1,5 +1,6 @@
 using RazorSlices;
 using StarFederation.Datastar.DependencyInjection;
+using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
 
@@ -15,7 +16,7 @@ public static class GameEndpoints
             async (string id, IGameRepository repo, IDatastarServerSentEventService sse) =>
             {
                 var game = await repo.GetGameAsync(id);
-                var model = Slices.GameModel.FromGame(id, game);
+                var model = GameModel.FromGame(id, game);
                 var slice = Slices.GameState.Create(model);
                 var fragment = await slice.RenderAsync();
                 await sse.MergeFragmentsAsync(fragment);
@@ -35,7 +36,7 @@ public static class GameEndpoints
                 var game = await repo.GetGameAsync(id);
                 var updatedGame = Game.MakeMove(game, new Position(position));
                 await repo.UpdateGameAsync(id, updatedGame, 0); // TODO: Handle version correctly
-                var model = Slices.GameModel.FromGame(id, game);
+                var model = GameModel.FromGame(id, game);
                 var slice = Slices.GameState.Create(model);
                 var fragment = await slice.RenderAsync();
                 await sse.MergeFragmentsAsync(fragment);

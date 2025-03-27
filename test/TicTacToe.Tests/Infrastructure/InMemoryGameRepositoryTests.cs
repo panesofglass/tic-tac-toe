@@ -1,5 +1,5 @@
+using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
-using TicTacToe.Web.Models;
 
 namespace TicTacToe.Tests.Infrastructure;
 

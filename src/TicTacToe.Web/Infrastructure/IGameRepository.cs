@@ -1,4 +1,4 @@
-using TicTacToe.Web.Models;
+using TicTacToe.Engine;
 
 namespace TicTacToe.Web.Infrastructure;
 
@@ -39,4 +39,3 @@ public class ConcurrencyException : Exception
     public ConcurrencyException(string gameId)
         : base($"Game with ID {gameId} was modified by another operation") { }
 }
-

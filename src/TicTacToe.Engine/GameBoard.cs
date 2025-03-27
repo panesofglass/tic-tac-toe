@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 
-namespace TicTacToe.Web.Models;
+namespace TicTacToe.Engine;
 
 /// <summary>
 /// Represents the current state of a tic-tac-toe game board.

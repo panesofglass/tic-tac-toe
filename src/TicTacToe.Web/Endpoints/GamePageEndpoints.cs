@@ -1,4 +1,6 @@
+using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
+using TicTacToe.Web.Models;
 
 namespace TicTacToe.Web.Endpoints;
 
@@ -12,8 +14,8 @@ public static class GamePageEndpoints
             async (string id, IGameRepository gameRepository) =>
             {
                 var game = await gameRepository.GetGameAsync(id);
-                var model = Slices.GameModel.FromGame(id, game);
-                return Results.Extensions.RazorSlice<Slices.GameState, Slices.GameModel>(model);
+                var model = GameModel.FromGame(id, game);
+                return Results.Extensions.RazorSlice<Slices.GameState, GameModel>(model);
             }
         );
     }

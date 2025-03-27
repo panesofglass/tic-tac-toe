@@ -1,4 +1,4 @@
-namespace TicTacToe.Web.Models;
+namespace TicTacToe.Engine;
 
 /// <summary>
 /// Represents a single move in a tic-tac-toe game.

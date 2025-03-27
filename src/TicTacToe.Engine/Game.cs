@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace TicTacToe.Web.Models;
+namespace TicTacToe.Engine;
 
 /// <summary>
 /// Represents a tic-tac-toe game, tracking board state and game status.

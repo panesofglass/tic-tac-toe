@@ -1,31 +1,33 @@
-namespace TicTacToe.Web.Slices;
+using TicTacToe.Engine;
+
+namespace TicTacToe.Web.Models;
 
 public record GameModel(
     string Id,
-    Models.Marker? CurrentPlayer,
-    Models.Marker?[] Board,
+    Marker? CurrentPlayer,
+    Marker?[] Board,
     bool IsComplete,
-    Models.Marker? Winner
+    Marker? Winner
 )
 {
-    public static GameModel FromGame(string id, Models.Game game) =>
+    public static GameModel FromGame(string id, Game game) =>
         game switch
         {
-            Models.Game.InProgress g => new GameModel(
+            Game.InProgress g => new GameModel(
                 Id: id,
                 CurrentPlayer: g.CurrentPlayer,
                 Board: g.Board.ToArray(),
                 IsComplete: false,
                 Winner: null
             ),
-            Models.Game.Winner g => new GameModel(
+            Game.Winner g => new GameModel(
                 Id: id,
                 CurrentPlayer: null,
                 Board: g.Board.ToArray(),
                 IsComplete: true,
                 Winner: g.WinningPlayer
             ),
-            Models.Game.Draw g => new GameModel(
+            Game.Draw g => new GameModel(
                 Id: id,
                 CurrentPlayer: null,
                 Board: g.Board.ToArray(),

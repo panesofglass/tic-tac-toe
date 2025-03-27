@@ -1,3 +1,4 @@
+using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
 
@@ -15,9 +16,9 @@ public static class HomeEndpoints
                 // var games = await gameRepository.GetGamesAsync();
                 var games = new List<(string, Game)>();
                 var model = games
-                    .Select((game) => Slices.GameModel.FromGame(game.Item1, game.Item2))
+                    .Select((game) => GameModel.FromGame(game.Item1, game.Item2))
                     .ToList();
-                return Results.Extensions.RazorSlice<Slices.Index, List<Slices.GameModel>>(model);
+                return Results.Extensions.RazorSlice<Slices.Index, List<GameModel>>(model);
             }
         );
     }

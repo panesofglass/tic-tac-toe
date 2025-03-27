@@ -1,6 +1,6 @@
-using TicTacToe.Web.Models;
+using TicTacToe.Engine;
 
-namespace TicTacToe.Tests.Models;
+namespace TicTacToe.Tests.Engine;
 
 public class GameTests
 {

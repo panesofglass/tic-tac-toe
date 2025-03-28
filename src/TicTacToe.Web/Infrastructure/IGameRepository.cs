@@ -5,9 +5,14 @@ namespace TicTacToe.Web.Infrastructure;
 public interface IGameRepository
 {
     /// <summary>
-    /// Creates a new game and returns its unique identifier
+    /// Creates a new game and returns its unique identifier and initial state
     /// </summary>
-    Task<(string GameId, Game Game)> CreateGameAsync();
+    Task<(string id, Game game)> CreateGameAsync();
+
+    /// <summary>
+    /// Retrieves all active games with their identifiers
+    /// </summary>
+    Task<IEnumerable<(string id, Game game)>> GetGamesAsync();
 
     /// <summary>
     /// Retrieves a game by its identifier

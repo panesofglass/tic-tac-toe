@@ -1,6 +1,7 @@
 using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
+using StarFederation.Datastar.DependencyInjection;
 
 namespace TicTacToe.Web.Endpoints;
 
@@ -11,14 +12,28 @@ public static class HomeEndpoints
         // Landing page HTML
         endpoints.MapGet(
             "/",
-            (IGameRepository gameRepository) =>
+            async (IGameRepository gameRepository) =>
             {
-                // var games = await gameRepository.GetGamesAsync();
-                var games = new List<(string, Game)>();
+                var games = await gameRepository.GetGamesAsync();
                 var model = games
-                    .Select((game) => GameModel.FromGame(game.Item1, game.Item2))
+                    .Select(g => GameModel.FromGame(g.id, g.game))
                     .ToList();
                 return Results.Extensions.RazorSlice<Slices.Index, List<GameModel>>(model);
+            }
+        );
+
+        // Game list fragment with SSE
+        endpoints.MapGet(
+            "/page",
+            async (IGameRepository repo, IDatastarServerSentEventService sse) =>
+            {
+                var games = await repo.GetGamesAsync();
+                var model = games
+                    .Select(g => GameModel.FromGame(g.id, g.game))
+                    .ToList();
+                var slice = Slices.GameList.Create(model);
+                var fragment = await slice.RenderAsync();
+                await sse.MergeFragmentsAsync(fragment);
             }
         );
     }

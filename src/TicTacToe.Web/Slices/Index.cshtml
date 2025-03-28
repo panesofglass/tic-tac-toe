@@ -1,8 +1,8 @@
-@inherits RazorSliceHttpResult<List<GameModel>>
+@inherits RazorSlice<List<GameModel>>
 @implements IUsesLayout<_Layout, LayoutModel>
 
 @await RenderPartialAsync(GameList.Create(Model))
 
 @functions {
-    public LayoutModel LayoutModel => new() { Title = "Home" };
+    public LayoutModel LayoutModel => new() { Title = "Tic-Tac-Toe Games" };
 }

@@ -14,42 +14,46 @@ public record GameModel(
         space switch
         {
             Square.Taken taken => taken.Marker,
-            _ => (Marker?)null,
+            _ => null,
         };
 
-    private static Marker?[] FromGameBoard(GameBoard board) =>
-        board.Select(FromSquare).ToArray();
+    private static Marker?[] FromBoard(GameBoard board) => board.Select(FromSquare).ToArray();
 
-    private static Marker? FindCurrentPlayer(GameBoard board)
-    {
-        var available = board.FirstOrDefault((space) => space is Square.Available);
-        return available == null ? null : ((Square.Available)available).NextMarker;
-    }
+    private static Marker? GetCurrentPlayer(Game game) =>
+        game switch
+        {
+            Game.InProgress g => g.Board[(Position)0] switch
+            {
+                Square.Available available => available.NextMarker,
+                _ => g.Board.OfType<Square.Available>().FirstOrDefault()?.NextMarker,
+            },
+            _ => null,
+        };
 
     public static GameModel FromGame(string id, Game game) =>
         game switch
         {
-            Game.InProgress g => new GameModel(
+            Game.InProgress g => new(
                 Id: id,
-                CurrentPlayer: FindCurrentPlayer(g.Board),
-                Board: FromGameBoard(g.Board),
+                Board: FromBoard(g.Board),
+                CurrentPlayer: GetCurrentPlayer(game),
                 IsComplete: false,
                 Winner: null
             ),
-            Game.Winner g => new GameModel(
+            Game.Winner g => new(
                 Id: id,
+                Board: FromBoard(g.Board),
                 CurrentPlayer: null,
-                Board: FromGameBoard(g.Board),
                 IsComplete: true,
                 Winner: g.WinningPlayer
             ),
-            Game.Draw g => new GameModel(
+            Game.Draw g => new(
                 Id: id,
+                Board: FromBoard(g.Board),
                 CurrentPlayer: null,
-                Board: FromGameBoard(g.Board),
                 IsComplete: true,
                 Winner: null
             ),
-            _ => throw new ArgumentException("Unexpected game state", nameof(game)),
+            _ => throw new ArgumentException("Invalid game state", nameof(game)),
         };
 }

@@ -7,7 +7,7 @@ public class InMemoryGameRepository : IGameRepository
 {
     private readonly ConcurrentDictionary<string, Game> _games = new();
 
-    public Task<(string GameId, Game Game)> CreateGameAsync()
+    public Task<(string id, Game game)> CreateGameAsync()
     {
         var gameId = Guid.NewGuid().ToString("N");
         var game = Game.Create();
@@ -19,6 +19,14 @@ public class InMemoryGameRepository : IGameRepository
         }
 
         return Task.FromResult((gameId, game));
+    }
+
+    public Task<IEnumerable<(string id, Game game)>> GetGamesAsync()
+    {
+        var games = _games
+            .Select(kvp => (kvp.Key, kvp.Value))
+            .ToList();
+        return Task.FromResult<IEnumerable<(string id, Game game)>>(games);
     }
 
     public Task<Game> GetGameAsync(string gameId)

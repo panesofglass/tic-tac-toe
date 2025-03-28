@@ -1,28 +1,26 @@
 @inherits RazorSlice<GameModel>
 
 <div>
-    <div id="board-@(Model.Id)" class="game-board" style="display: grid; grid-template-columns: repeat(3, 100px); gap: 2px;">
+    <div id="board-@(Model.Id)" class="game-board">
         @for (byte row = 0; row < 3; row++)
         {
             @for (byte col = 0; col < 3; col++)
             {
-                var position = Engine.Position.At(row, col);
-                var marker = Model.Board[position];
-                <div style="width: 100px; height: 100px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 2em;">
+                var position = new Position(row, col);
+                var marker = Model.Board[row * 3 + col];
+                <div class="cell">
                     @if (marker.HasValue)
                     {
                         @marker.Value.ToString()
                     }
                     else if (!Model.IsComplete)
                     {
-                        <form method="post" action="/@Model.Id">
-                            <input type="hidden" name="Position.Row" value="@row" />
-                            <input type="hidden" name="Position.Column" value="@col" />
-                            <input type="hidden" name="Marker" value="@Model.CurrentPlayer" />
-                            <button type="submit" style="width: 100%; height: 100%; background: none; border: none; cursor: pointer;">
-                                &nbsp;
-                            </button>
-                        </form>
+                        <div
+                            class="cell"
+                            data-on-click="@@post('/game/@(Model.Id)')"
+                            data-params='{ "position": @(row * 3 + col), "marker": "@Model.CurrentPlayer" }'>
+                            &nbsp;
+                        </div>
                     }
                 </div>
             }
@@ -40,6 +38,7 @@
             {
                 <p>Game Over! It's a draw!</p>
             }
+            <a href="/" data-on-click="@@navigate">Back to Games</a>
         }
         else
         {
@@ -47,4 +46,3 @@
         }
     </div>
 </div>
-

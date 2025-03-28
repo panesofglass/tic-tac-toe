@@ -5,11 +5,11 @@ namespace TicTacToe.Web.Infrastructure;
 
 public class InMemoryGameRepository : IGameRepository
 {
-    private readonly ConcurrentDictionary<string, Game> _games = new();
+    private readonly ConcurrentDictionary<Guid, Game> _games = new();
 
-    public Task<(string id, Game game)> CreateGameAsync()
+    public Task<(Guid id, Game game)> CreateGameAsync()
     {
-        var gameId = Guid.NewGuid().ToString("N");
+        var gameId = Guid.NewGuid();
         var game = Game.Create();
 
         if (!_games.TryAdd(gameId, game))
@@ -21,15 +21,15 @@ public class InMemoryGameRepository : IGameRepository
         return Task.FromResult((gameId, game));
     }
 
-    public Task<IEnumerable<(string id, Game game)>> GetGamesAsync()
+    public Task<IEnumerable<(Guid id, Game game)>> GetGamesAsync()
     {
         var games = _games
             .Select(kvp => (kvp.Key, kvp.Value))
             .ToList();
-        return Task.FromResult<IEnumerable<(string id, Game game)>>(games);
+        return Task.FromResult<IEnumerable<(Guid id, Game game)>>(games);
     }
 
-    public Task<Game> GetGameAsync(string gameId)
+    public Task<Game> GetGameAsync(Guid gameId)
     {
         if (!_games.TryGetValue(gameId, out var game))
         {
@@ -39,7 +39,7 @@ public class InMemoryGameRepository : IGameRepository
         return Task.FromResult(game);
     }
 
-    public Task<Game> UpdateGameAsync(string gameId, Game game)
+    public Task<Game> UpdateGameAsync(Guid gameId, Game game)
     {
         if (!_games.TryGetValue(gameId, out var currentEntry))
         {
@@ -56,7 +56,7 @@ public class InMemoryGameRepository : IGameRepository
         return Task.FromResult(game);
     }
 
-    public Task DeleteGameAsync(string gameId)
+    public Task DeleteGameAsync(Guid gameId)
     {
         _games.TryRemove(gameId, out _);
         return Task.CompletedTask;

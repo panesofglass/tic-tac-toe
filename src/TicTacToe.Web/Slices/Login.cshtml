@@ -1,0 +1,30 @@
+@using TicTacToe.Web.Infrastructure
+@inherits RazorSlice<(string Title, string? Error)>
+@implements IUsesLayout<_Layout, LayoutModel>
+
+<div class="login-form">
+    <h2>Login</h2>
+    <form method="post" data-on-submit="@@post('/login')" @Html.ValidationAttributes(Model.Error)>
+        @Html.ValidationMessage(Model.Error)
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="submit">Login</button>
+    </form>
+    <div class="form-footer">
+        Don't have an account? <a href="/register" data-on-click="@@navigate">Register</a>
+    </div>
+</div>
+
+@functions {
+    public LayoutModel LayoutModel => new()
+    {
+        Title = Model.Title,
+        CurrentPlayer = await Context.GetCurrentPlayerAsync()
+    };
+}

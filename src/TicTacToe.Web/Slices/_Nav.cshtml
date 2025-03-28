@@ -1,0 +1,46 @@
+@inherits RazorSlice<Player?>
+
+<nav class="main-nav">
+    @if (Model?.IsRegistered ?? false)
+    {
+        <span>Welcome, @Model.Name!</span>
+        <form method="post" action="/logout" data-on-submit="@@post('/logout')">
+            <button type="submit" class="nav-link">Logout</button>
+        </form>
+    }
+    else
+    {
+        <div class="auth-links">
+            <a href="/login" data-on-click="@@navigate">Login</a>
+            <a href="/register" data-on-click="@@navigate">Register</a>
+        </div>
+    }
+</nav>
+
+<style>
+    .main-nav {
+        padding: 1rem;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .auth-links {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .nav-link {
+        background: none;
+        border: none;
+        color: #007bff;
+        cursor: pointer;
+        text-decoration: underline;
+        padding: 0;
+    }
+
+    .nav-link:hover {
+        color: #0056b3;
+    }
+</style>

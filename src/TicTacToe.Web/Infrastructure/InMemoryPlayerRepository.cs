@@ -6,17 +6,24 @@ using System.Threading.Tasks;
 
 namespace TicTacToe.Web.Infrastructure
 {
-    /// <summary>
-    /// Thread-safe in-memory implementation of IPlayerRepository
-    /// </summary>
     public class InMemoryPlayerRepository : IPlayerRepository
     {
         private readonly ConcurrentDictionary<Guid, Player> _players = new();
+        private readonly ConcurrentDictionary<string, Guid> _emailIndex = new();
 
-        public Task<Player> GetByIdAsync(Guid id)
+        public Task<Player?> GetByIdAsync(Guid id)
         {
             _players.TryGetValue(id, out var player);
             return Task.FromResult(player);
+        }
+
+        public Task<Player?> GetByEmailAsync(string email)
+        {
+            if (_emailIndex.TryGetValue(email.ToLowerInvariant(), out var id))
+            {
+                return GetByIdAsync(id);
+            }
+            return Task.FromResult<Player?>(null);
         }
 
         public Task<IEnumerable<Player>> GetAllAsync()
@@ -41,6 +48,17 @@ namespace TicTacToe.Web.Infrastructure
             player.GamesPlayed = 0;
             player.GamesWon = 0;
 
+            // Check for email uniqueness if provided
+            if (!string.IsNullOrEmpty(player.Email))
+            {
+                var normalizedEmail = player.Email.ToLowerInvariant();
+                if (_emailIndex.ContainsKey(normalizedEmail))
+                {
+                    throw new InvalidOperationException($"Email {player.Email} is already registered");
+                }
+                _emailIndex[normalizedEmail] = player.Id;
+            }
+
             if (!_players.TryAdd(player.Id, player))
                 throw new InvalidOperationException($"Player with Id {player.Id} already exists");
 
@@ -59,6 +77,21 @@ namespace TicTacToe.Web.Infrastructure
             if (!result)
                 return Task.FromResult(false);
 
+            // Handle email updates
+            if (!string.IsNullOrEmpty(existingPlayer.Email))
+            {
+                _emailIndex.TryRemove(existingPlayer.Email.ToLowerInvariant(), out _);
+            }
+            if (!string.IsNullOrEmpty(player.Email))
+            {
+                var normalizedEmail = player.Email.ToLowerInvariant();
+                if (_emailIndex.ContainsKey(normalizedEmail) && _emailIndex[normalizedEmail] != player.Id)
+                {
+                    throw new InvalidOperationException($"Email {player.Email} is already registered");
+                }
+                _emailIndex[normalizedEmail] = player.Id;
+            }
+
             // Preserve creation time and stats
             player.CreatedAt = existingPlayer.CreatedAt;
             player.GamesPlayed = existingPlayer.GamesPlayed;
@@ -70,8 +103,11 @@ namespace TicTacToe.Web.Infrastructure
 
         public Task<bool> DeleteAsync(Guid id)
         {
-            var result = _players.TryRemove(id, out _);
-            return Task.FromResult(result);
+            if (_players.TryRemove(id, out var player) && !string.IsNullOrEmpty(player.Email))
+            {
+                _emailIndex.TryRemove(player.Email.ToLowerInvariant(), out _);
+            }
+            return Task.FromResult(true);
         }
 
         public Task<IEnumerable<Player>> FindByNameAsync(string name)
@@ -126,6 +162,35 @@ namespace TicTacToe.Web.Infrastructure
                 });
 
             return Task.FromResult(result);
+        }
+
+        public Task<bool> RegisterPlayerAsync(Guid id, string email, string name, string passwordHash)
+        {
+            var normalizedEmail = email.ToLowerInvariant();
+            if (_emailIndex.ContainsKey(normalizedEmail))
+            {
+                return Task.FromResult(false);
+            }
+
+            var success = false;
+            _players.AddOrUpdate(
+                id,
+                (key) => null, // Should not add a new player
+                (key, existingPlayer) =>
+                {
+                    existingPlayer.Email = email;
+                    existingPlayer.Name = name;
+                    existingPlayer.PasswordHash = passwordHash;
+                    success = true;
+                    return existingPlayer;
+                });
+
+            if (success)
+            {
+                _emailIndex[normalizedEmail] = id;
+            }
+
+            return Task.FromResult(success);
         }
     }
 }

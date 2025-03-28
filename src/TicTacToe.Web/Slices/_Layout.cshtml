@@ -1,3 +1,5 @@
+@using Microsoft.Extensions.DependencyInjection
+@using TicTacToe.Web.Infrastructure
 @inherits RazorLayoutSlice<LayoutModel>
 
 <!DOCTYPE html>
@@ -5,6 +7,7 @@
 <head>
     <title>@Model.Title - Tic-Tac-Toe</title>
     <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-beta.10/bundles/datastar.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="/css/forms.css" asp-append-version="true">
     <style>
         .game-board {
             display: grid;
@@ -31,6 +34,8 @@
     </style>
 </head>
 <body>
+    @await RenderPartialAsync(Slices._Nav.Create(Model.CurrentPlayer))
+
     <h1>@Model.Title</h1>
     <main id="root">
         @await RenderBodyAsync()

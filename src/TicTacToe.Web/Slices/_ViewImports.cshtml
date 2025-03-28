@@ -1,16 +1,20 @@
 @inherits RazorSliceHttpResult
 
 @using System.Globalization
+@using Microsoft.AspNetCore.Html
 @using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Mvc.Rendering
 @using Microsoft.AspNetCore.Razor
 @using Microsoft.AspNetCore.Http.HttpResults
+@using Microsoft.Extensions.DependencyInjection
 @using RazorSlices
 
+@using Engine = TicTacToe.Engine
 @using TicTacToe.Web
+@using TicTacToe.Web.Infrastructure
 @using TicTacToe.Web.Models
 @using TicTacToe.Web.Slices
-@using Engine = TicTacToe.Engine
+@using static TicTacToe.Web.Models.AuthModels
 
 @tagHelperPrefix __disable_tagHelpers__:
 @removeTagHelper *, Microsoft.AspNetCore.Mvc.Razor
-

@@ -4,5 +4,9 @@
 @await RenderPartialAsync(GameList.Create(Model))
 
 @functions {
-    public LayoutModel LayoutModel => new() { Title = "Tic-Tac-Toe Games" };
+    public LayoutModel LayoutModel => new()
+    {
+        Title = "Games",
+        CurrentPlayer = await Context.GetCurrentPlayerAsync()
+    };
 }

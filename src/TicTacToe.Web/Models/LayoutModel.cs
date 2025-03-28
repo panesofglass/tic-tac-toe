@@ -1,6 +1,9 @@
-namespace TicTacToe.Web.Slices;
+using TicTacToe.Web.Infrastructure;
+
+namespace TicTacToe.Web.Models;
 
 public class LayoutModel
 {
-    public string Title { get; set; } = "Tic-Tac-Toe";
+    public string Title { get; init; } = "Tic-Tac-Toe";
+    public Player? CurrentPlayer { get; init; }
 }

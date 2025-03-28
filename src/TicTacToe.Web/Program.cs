@@ -8,14 +8,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddWebEncoders();
 builder.Services.AddDatastar();
 
-// Add game repository
+// Configure repositories
 builder.Services.AddSingleton<IGameRepository, InMemoryGameRepository>();
+builder.Services.AddSingleton<IPlayerRepository, InMemoryPlayerRepository>();
+builder.Services.AddSingleton<IGamePlayerRepository, InMemoryGamePlayerRepository>();
 
 var app = builder.Build();
 
 // Configure static file serving
 app.UseStatusCodePages();
+app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseAuthorization();
 
 // Map endpoints
 app.MapHome();

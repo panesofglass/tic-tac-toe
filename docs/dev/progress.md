@@ -14,9 +14,10 @@
 
 ### In Progress [-]
 - Player Management Integration
-  - [ ] Session-based player identity system
-    - [ ] Generate/store player IDs in session
-    - [ ] Track marker assignments per game
+  - [ ] Repository-based player management
+    - [ ] Implement IPlayerRepository interface
+    - [ ] Implement IGamePlayerRepository interface
+    - [ ] Handle player data persistence
   - [ ] Game state with player context
     - [ ] Update Game entity with player slots
     - [ ] Handle turn tracking and validation
@@ -46,15 +47,18 @@
 
 ## Implementation Plan
 
-### 1. Session-Based Player Identity
-- [ ] Create player session middleware
-  - [ ] Generate unique player IDs
-  - [ ] Store player info in session
-  - [ ] Track marker assignments
-- [ ] Implement session validation
-  - [ ] Verify player identity
-  - [ ] Check turn order
-  - [ ] Validate marker assignments
+### 1. Repository-Based Player Management
+- [ ] Design player repositories
+  - [ ] Define IPlayerRepository interface
+    - [ ] GetPlayerById, CreatePlayer, UpdatePlayer methods
+    - [ ] Player entity with unique ID and metadata
+  - [ ] Define IGamePlayerRepository interface
+    - [ ] AssignPlayerToGame, GetPlayersForGame methods
+    - [ ] Handle player-game relationships
+- [ ] Implement repository pattern
+  - [ ] Create concrete implementations of repositories
+  - [ ] Configure dependency injection
+  - [ ] Integrate with existing game logic
 
 ### 2. Game Repository and Domain Model Updates
 - [ ] Enhance Game entity
@@ -64,7 +68,7 @@
 - [ ] Update IGameRepository
   - [ ] Add player association methods
   - [ ] Handle turn management
-  - [ ] Store session data
+  - [ ] Store player associations
 
 ### 3. Game Flow Implementation
 - [ ] Update game creation
@@ -88,7 +92,7 @@
 
 ### 5. Testing and Validation
 - [ ] Unit tests
-  - [ ] Session management
+  - [ ] Repository implementations
   - [ ] Game repository
   - [ ] Turn validation
 - [ ] Integration tests
@@ -98,10 +102,12 @@
 
 ## Technical Notes
 
-### Session Management
-- Using ASP.NET Core session state
-- Simple player ID generation
-- No complex authentication needed initially
+### Repository Pattern Benefits
+- Clear separation of concerns for data access
+- Improved testability through interface-based design
+- Flexible storage options (in-memory, database, etc.)
+- Scalable approach that can evolve with application needs
+- Reduced coupling between data access and business logic
 
 ### Game State
 - Rich domain types replacing GameModel

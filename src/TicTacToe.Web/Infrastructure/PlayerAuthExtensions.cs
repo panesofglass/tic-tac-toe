@@ -1,9 +1,3 @@
-using System;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using System.Threading.Tasks;
-
 namespace TicTacToe.Web.Infrastructure;
 
 public static class PlayerAuthExtensions
@@ -42,7 +36,7 @@ public static class PlayerAuthExtensions
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
-            MaxAge = TimeSpan.FromDays(30)
+            MaxAge = TimeSpan.FromDays(30),
         };
 
         context.Response.Cookies.Append(PlayerIdCookieName, playerId.ToString(), cookieOptions);
@@ -61,7 +55,8 @@ public static class PlayerAuthExtensions
     /// </summary>
     public static async Task<Guid> EnsurePlayerAsync(
         this HttpContext context,
-        IPlayerRepository playerRepository)
+        IPlayerRepository playerRepository
+    )
     {
         var playerId = context.GetCurrentPlayerId();
         if (playerId.HasValue)
@@ -75,14 +70,7 @@ public static class PlayerAuthExtensions
         }
 
         // Create a new player and set the cookie
-        var newPlayer = new Player
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Player_{Guid.NewGuid().ToString().Substring(0, 8)}",
-            CreatedAt = DateTimeOffset.UtcNow,
-            LastActive = DateTimeOffset.UtcNow
-        };
-
+        var newPlayer = Player.Create();
         await playerRepository.CreateAsync(newPlayer);
         context.SignInPlayer(newPlayer.Id);
         return newPlayer.Id;

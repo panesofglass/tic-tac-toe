@@ -13,7 +13,7 @@ public static class GameEndpoints
         // Full game page
         endpoints.MapGet(
             "/game/{id}",
-            (string id, IGameRepository repo) =>
+            async (Guid id, IGameRepository repo) =>
             {
                 var game = await repo.GetGameAsync(id);
                 var model = GameModel.FromGame(id, game);
@@ -24,7 +24,7 @@ public static class GameEndpoints
         // Game state fragment with SSE
         endpoints.MapGet(
             "/page/game/{id}",
-            async (string id, IGameRepository repo, IDatastarServerSentEventService sse) =>
+            async (Guid id, IGameRepository repo, IDatastarServerSentEventService sse) =>
             {
                 var game = await repo.GetGameAsync(id);
                 var model = GameModel.FromGame(id, game);
@@ -43,10 +43,9 @@ public static class GameEndpoints
                 HttpContext context
             ) =>
             {
-                var id = await repo.CreateGameAsync();
-                var game = await repo.GetGameAsync(id);
+                var (id, game) = await repo.CreateGameAsync();
                 var model = GameModel.FromGame(id, game);
-                
+
                 // Also notify the game list that it needs to update
                 var listSlice = Slices.GameList.Create(
                     (await repo.GetGamesAsync())
@@ -64,18 +63,16 @@ public static class GameEndpoints
         endpoints.MapPost(
             "/game/{id}",
             async (
-                string id,
+                Guid id,
                 MoveModel move,
                 IGameRepository repo,
                 IDatastarServerSentEventService sse
             ) =>
             {
                 var game = await repo.GetGameAsync(id);
-                var updatedGame = game.WithMove(
-                    new Move(move.Position, move.Marker, DateTimeOffset.UtcNow)
-                );
+                var updatedGame = game.WithMove(Move.Create(move.Position, move.Marker));
                 await repo.UpdateGameAsync(id, updatedGame);
-                
+
                 // Send updated game state
                 var model = GameModel.FromGame(id, updatedGame);
                 var slice = Slices.Game.Create(model);

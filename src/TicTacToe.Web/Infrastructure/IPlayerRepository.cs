@@ -1,58 +1,70 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 namespace TicTacToe.Web.Infrastructure
 {
     /// <summary>
     /// Represents a player in the Tic-Tac-Toe game
     /// </summary>
-    public class Player
-    {
+    public record Player(
         /// <summary>
         /// Unique identifier for the player
         /// </summary>
-        public Guid Id { get; set; }
-
+        Guid Id,
         /// <summary>
         /// Display name of the player
         /// </summary>
-        public string Name { get; set; }
-
+        string? Name,
         /// <summary>
         /// Email address for login (optional)
         /// </summary>
-        public string? Email { get; set; }
-
+        string? Email,
         /// <summary>
         /// Hashed password for authentication (optional)
         /// </summary>
-        public string? PasswordHash { get; set; }
-
+        string? PasswordHash,
+        /// <summary>
+        /// Date and time when the player was created (UTC)
+        /// </summary>
+        DateTimeOffset CreatedAt,
+        /// <summary>
+        /// Date and time when the player was last active (UTC)
+        /// </summary>
+        DateTimeOffset LastActive,
+        /// <summary>
+        /// Number of games played by the player
+        /// </summary>
+        int GamesPlayed,
+        /// <summary>
+        /// Number of games won by the player
+        /// </summary>
+        int GamesWon
+    )
+    {
         /// <summary>
         /// Whether this is a registered user or anonymous player
         /// </summary>
         public bool IsRegistered => !string.IsNullOrEmpty(Email);
 
         /// <summary>
-        /// Date and time when the player was created (UTC)
+        /// Factory method to create a new Player.
         /// </summary>
-        public DateTimeOffset CreatedAt { get; set; }
-
-        /// <summary>
-        /// Date and time when the player was last active (UTC)
-        /// </summary>
-        public DateTimeOffset LastActive { get; set; }
-
-        /// <summary>
-        /// Number of games played by the player
-        /// </summary>
-        public int GamesPlayed { get; set; }
-
-        /// <summary>
-        /// Number of games won by the player
-        /// </summary>
-        public int GamesWon { get; set; }
+        public static Player Create(
+            Guid? id = null,
+            string? name = null,
+            string? email = null,
+            string? passwordHash = null
+        )
+        {
+            var now = DateTimeOffset.UtcNow;
+            return new Player(
+                id ?? Guid.NewGuid(),
+                name ?? $"Player_{Guid.NewGuid().ToString().Substring(0, 8)}",
+                email,
+                passwordHash,
+                now,
+                now,
+                0,
+                0
+            );
+        }
     }
 
     /// <summary>

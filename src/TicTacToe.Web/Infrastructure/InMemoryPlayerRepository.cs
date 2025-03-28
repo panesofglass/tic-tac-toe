@@ -1,8 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace TicTacToe.Web.Infrastructure
 {
@@ -14,7 +10,7 @@ namespace TicTacToe.Web.Infrastructure
         public Task<Player?> GetByIdAsync(Guid id)
         {
             _players.TryGetValue(id, out var player);
-            return Task.FromResult(player);
+            return Task.FromResult<Player?>(player);
         }
 
         public Task<Player?> GetByEmailAsync(string email)
@@ -54,7 +50,9 @@ namespace TicTacToe.Web.Infrastructure
                 var normalizedEmail = player.Email.ToLowerInvariant();
                 if (_emailIndex.ContainsKey(normalizedEmail))
                 {
-                    throw new InvalidOperationException($"Email {player.Email} is already registered");
+                    throw new InvalidOperationException(
+                        $"Email {player.Email} is already registered"
+                    );
                 }
                 _emailIndex[normalizedEmail] = player.Id;
             }
@@ -85,9 +83,14 @@ namespace TicTacToe.Web.Infrastructure
             if (!string.IsNullOrEmpty(player.Email))
             {
                 var normalizedEmail = player.Email.ToLowerInvariant();
-                if (_emailIndex.ContainsKey(normalizedEmail) && _emailIndex[normalizedEmail] != player.Id)
+                if (
+                    _emailIndex.ContainsKey(normalizedEmail)
+                    && _emailIndex[normalizedEmail] != player.Id
+                )
                 {
-                    throw new InvalidOperationException($"Email {player.Email} is already registered");
+                    throw new InvalidOperationException(
+                        $"Email {player.Email} is already registered"
+                    );
                 }
                 _emailIndex[normalizedEmail] = player.Id;
             }
@@ -115,8 +118,8 @@ namespace TicTacToe.Web.Infrastructure
             if (string.IsNullOrWhiteSpace(name))
                 return Task.FromResult(Enumerable.Empty<Player>());
 
-            var matchingPlayers = _players.Values
-                .Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            var matchingPlayers = _players
+                .Values.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             return Task.FromResult(matchingPlayers.AsEnumerable());
@@ -124,71 +127,58 @@ namespace TicTacToe.Web.Infrastructure
 
         public Task<bool> UpdateLastActiveAsync(Guid id)
         {
-            var result = _players.TryGetValue(id, out var player);
-            if (!result)
+            if (!_players.TryGetValue(id, out var existing))
                 return Task.FromResult(false);
 
-            player.LastActive = DateTimeOffset.UtcNow;
-            return Task.FromResult(true);
+            var nextPlayer = existing with { LastActive = DateTimeOffset.UtcNow };
+            var result = _players.TryUpdate(id, nextPlayer, existing);
+            return Task.FromResult(result);
         }
 
         public Task<bool> IncrementGamesPlayedAsync(Guid id)
         {
-            var result = false;
-            _players.AddOrUpdate(
-                id,
-                (key) => null, // Should not add a new player
-                (key, existingPlayer) =>
-                {
-                    existingPlayer.GamesPlayed++;
-                    result = true;
-                    return existingPlayer;
-                });
+            if (!_players.TryGetValue(id, out var existing))
+                return Task.FromResult(false);
 
+            var nextPlayer = existing with { GamesPlayed = existing.GamesPlayed + 1 };
+            var result = _players.TryUpdate(id, nextPlayer, existing);
             return Task.FromResult(result);
         }
 
         public Task<bool> IncrementGamesWonAsync(Guid id)
         {
-            var result = false;
-            _players.AddOrUpdate(
-                id,
-                (key) => null, // Should not add a new player
-                (key, existingPlayer) =>
-                {
-                    existingPlayer.GamesWon++;
-                    result = true;
-                    return existingPlayer;
-                });
+            if (!_players.TryGetValue(id, out var existing))
+                return Task.FromResult(false);
 
+            var nextPlayer = existing with { GamesWon = existing.GamesWon + 1 };
+            var result = _players.TryUpdate(id, nextPlayer, existing);
             return Task.FromResult(result);
         }
 
-        public Task<bool> RegisterPlayerAsync(Guid id, string email, string name, string passwordHash)
+        public Task<bool> RegisterPlayerAsync(
+            Guid id,
+            string email,
+            string name,
+            string passwordHash
+        )
         {
+            if (!_players.TryGetValue(id, out var existing))
+                return Task.FromResult(false);
+
             var normalizedEmail = email.ToLowerInvariant();
             if (_emailIndex.ContainsKey(normalizedEmail))
-            {
                 return Task.FromResult(false);
-            }
 
-            var success = false;
-            _players.AddOrUpdate(
-                id,
-                (key) => null, // Should not add a new player
-                (key, existingPlayer) =>
-                {
-                    existingPlayer.Email = email;
-                    existingPlayer.Name = name;
-                    existingPlayer.PasswordHash = passwordHash;
-                    success = true;
-                    return existingPlayer;
-                });
-
-            if (success)
+            var nextPlayer = existing with
             {
+                Email = email,
+                Name = name,
+                PasswordHash = passwordHash,
+            };
+
+            var success = _players.TryUpdate(id, nextPlayer, existing);
+            if (success)
                 _emailIndex[normalizedEmail] = id;
-            }
 
             return Task.FromResult(success);
         }

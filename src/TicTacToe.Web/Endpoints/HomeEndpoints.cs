@@ -1,7 +1,7 @@
-using TicTacToe.Engine;
+using RazorSlices;
+using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
-using StarFederation.Datastar.DependencyInjection;
 
 namespace TicTacToe.Web.Endpoints;
 
@@ -15,9 +15,7 @@ public static class HomeEndpoints
             async (IGameRepository gameRepository) =>
             {
                 var games = await gameRepository.GetGamesAsync();
-                var model = games
-                    .Select(g => GameModel.FromGame(g.id, g.game))
-                    .ToList();
+                var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
                 return Results.Extensions.RazorSlice<Slices.Index, List<GameModel>>(model);
             }
         );
@@ -28,9 +26,7 @@ public static class HomeEndpoints
             async (IGameRepository repo, IDatastarServerSentEventService sse) =>
             {
                 var games = await repo.GetGamesAsync();
-                var model = games
-                    .Select(g => GameModel.FromGame(g.id, g.game))
-                    .ToList();
+                var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
                 var slice = Slices.GameList.Create(model);
                 var fragment = await slice.RenderAsync();
                 await sse.MergeFragmentsAsync(fragment);

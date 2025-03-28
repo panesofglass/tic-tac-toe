@@ -3,7 +3,7 @@ using TicTacToe.Engine;
 namespace TicTacToe.Web.Models;
 
 public record GameModel(
-    string Id,
+    Guid Id,
     Marker?[] Board,
     Marker? CurrentPlayer,
     bool IsComplete,
@@ -30,7 +30,7 @@ public record GameModel(
             _ => null,
         };
 
-    public static GameModel FromGame(string id, Game game) =>
+    public static GameModel FromGame(Guid id, Game game) =>
         game switch
         {
             Game.InProgress g => new(

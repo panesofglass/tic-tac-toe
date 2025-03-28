@@ -1,5 +1,4 @@
-@using TicTacToe.Web.Infrastructure
-@inherits RazorSlice<(string Title, string? Error)>
+@inherits RazorSliceHttpResult<(string Title, string? Error)>
 @implements IUsesLayout<_Layout, LayoutModel>
 
 <div class="register-form">

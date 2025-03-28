@@ -14,13 +14,16 @@
 
 ### In Progress [-]
 - Player Management Integration
-  - [ ] Define player identity/session model
-  - [ ] Implement player authentication
-  - [ ] Associate players with markers (X/O)
+  - [ ] Session-based player identity system
+    - [ ] Generate/store player IDs in session
+    - [ ] Track marker assignments per game
+  - [ ] Game state with player context
+    - [ ] Update Game entity with player slots
+    - [ ] Handle turn tracking and validation
 - Frontend Implementation
-  - [ ] Player-specific game board rendering
-  - [ ] Interactive square handling based on player context
-  - [ ] Real-time updates with proper player context
+  - [ ] Player-aware game board rendering
+  - [ ] Interactive squares for current player
+  - [ ] Real-time updates with proper context
 
 ### Planned [•]
 - Game persistence
@@ -41,46 +44,71 @@
 - Added _Layout.cshtml with DataStar integration
 - Decision: Refactor to remove GameModel in favor of domain types
 
-## Next Steps
+## Implementation Plan
 
-1. Player Management
-   - Design player identity model
-     - [ ] Simple session-based authentication
-     - [ ] Player to marker assignment
-     - [ ] Player perspective management
-   - Update game interaction
-     - [ ] Track current player in game sessions
-     - [ ] Handle player/marker authorization
-     - [ ] Manage player turns
+### 1. Session-Based Player Identity
+- [ ] Create player session middleware
+  - [ ] Generate unique player IDs
+  - [ ] Store player info in session
+  - [ ] Track marker assignments
+- [ ] Implement session validation
+  - [ ] Verify player identity
+  - [ ] Check turn order
+  - [ ] Validate marker assignments
 
-2. Frontend View Updates
-   - Update game display
-     - [ ] Remove GameModel abstraction
-     - [ ] Render actual Square states (Available/Taken)
-     - [ ] Show interactive squares based on player context
-   - Real-time game state
-     - [ ] SSE updates with player context
-     - [ ] Interactive vs. non-interactive states
-     - [ ] Turn indicators and game status
+### 2. Game Repository and Domain Model Updates
+- [ ] Enhance Game entity
+  - [ ] Add player slots (ID + marker)
+  - [ ] Implement turn tracking
+  - [ ] Remove GameModel abstraction
+- [ ] Update IGameRepository
+  - [ ] Add player association methods
+  - [ ] Handle turn management
+  - [ ] Store session data
 
-3. Game Flow Management
-   - [ ] Game creation with player assignment
-   - [ ] Turn management and validation
-   - [ ] Game completion and cleanup
+### 3. Game Flow Implementation
+- [ ] Update game creation
+  - [ ] Assign first player as X
+  - [ ] Create second player join flow
+  - [ ] Handle marker assignments
+- [ ] Implement turn validation
+  - [ ] Check player identity
+  - [ ] Validate marker usage
+  - [ ] Enforce turn order
 
-4. Add game persistence
-   - Implement IGameRepository
-   - Add concurrency handling
-   - Set up session management
+### 4. UI and Real-Time Updates
+- [ ] Update Razor views
+  - [ ] Use domain types directly
+  - [ ] Add player-specific rendering
+  - [ ] Show interactive squares for current player
+- [ ] Enhance real-time updates
+  - [ ] Display opponent moves
+  - [ ] Update turn indicators
+  - [ ] Show game status
 
-## Implementation Notes
+### 5. Testing and Validation
+- [ ] Unit tests
+  - [ ] Session management
+  - [ ] Game repository
+  - [ ] Turn validation
+- [ ] Integration tests
+  - [ ] Player flow
+  - [ ] Game interactions
+  - [ ] Real-time updates
 
-### Player Management
-- Consider using simple session-based identity for MVP
-- Track player-to-marker assignment per game
-- Use player context to determine square interactivity
+## Technical Notes
 
-### View Considerations
-- Direct use of GameBoard and Square types in views
-- Player-specific rendering of Available squares
-- Real-time updates must maintain player context
+### Session Management
+- Using ASP.NET Core session state
+- Simple player ID generation
+- No complex authentication needed initially
+
+### Game State
+- Rich domain types replacing GameModel
+- Player slots with marker assignments
+- Turn tracking based on player identity
+
+### UI Considerations
+- Player-specific board rendering
+- Interactive elements based on turn state
+- Real-time updates maintaining player context

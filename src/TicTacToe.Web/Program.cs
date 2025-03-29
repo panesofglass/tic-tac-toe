@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Engine;
 using TicTacToe.Web.Endpoints;
@@ -22,36 +22,36 @@ builder.Services.AddWebEncoders().AddDatastar();
 
 // Configure auth
 builder
-    .Services.AddAuthorization(options =>
+    .Services.AddDbContext<TicTacToeIdentityDbContext>(options =>
+        options.UseInMemoryDatabase("Identity")
+    )
+    .AddAuthorization(options =>
     {
         options.FallbackPolicy = new AuthorizationPolicyBuilder()
             .RequireAuthenticatedUser()
             .Build();
     })
-    .AddAuthentication(options =>
-    {
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    })
-    .AddCookie(options =>
-    {
-        options.Cookie.Name = "playerId";
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Strict;
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
-        options.LoginPath = "/login";
-        options.LogoutPath = "/logout";
-        options.ReturnUrlParameter = "redirectUrl";
-        options.SlidingExpiration = true;
-    });
+    .AddIdentityApiEndpoints<IdentityUser>()
+    .AddEntityFrameworkStores<TicTacToeIdentityDbContext>();
+
+// Configure cookie settings
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "playerId";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
+    options.LoginPath = "/login";
+    options.LogoutPath = "/logout";
+    options.ReturnUrlParameter = "redirectUrl";
+    options.SlidingExpiration = true;
+});
 
 // Configure repositories and services
 builder
     .Services.AddSingleton<IGameRepository, InMemoryGameRepository>()
-    .AddSingleton<IPlayerRepository, InMemoryPlayerRepository>()
     .AddSingleton<IGamePlayerRepository, InMemoryGamePlayerRepository>()
-    .AddSingleton<IClaimsTransformation, PlayerClaimsTransformation>()
-    .AddSingleton<PasswordHasher>()
     .ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.TypeInfoResolverChain.Insert(0, TicTacToeJsonContext.Default);
@@ -73,6 +73,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// app.MapIdentityApi<IdentityUser>();
 
 // Map endpoints
 app.MapAuth();

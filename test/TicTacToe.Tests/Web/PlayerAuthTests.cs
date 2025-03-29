@@ -1,21 +1,27 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using TicTacToe.Web.Infrastructure;
+using TicTacToe.Web.Models;
 
 namespace TicTacToe.Tests.Web;
 
 public class PlayerAuthTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
-    private readonly IPlayerRepository _playerRepository;
-    private readonly PasswordHasher _passwordHasher;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly SignInManager<IdentityUser> _signInManager;
+    private readonly UserManager<IdentityUser> _userManager;
 
     public PlayerAuthTests(WebApplicationFactory<Program> factory)
     {
         _factory = factory;
-        _playerRepository = factory.Services.GetRequiredService<IPlayerRepository>();
-        _passwordHasher = factory.Services.GetRequiredService<PasswordHasher>();
+        _httpContextAccessor = factory.Services.GetRequiredService<IHttpContextAccessor>();
+        _signInManager = factory.Services.GetRequiredService<SignInManager<IdentityUser>>();
+        _userManager = factory.Services.GetRequiredService<UserManager<IdentityUser>>();
     }
 
     [Fact]
@@ -27,33 +33,27 @@ public class PlayerAuthTests : IClassFixture<WebApplicationFactory<Program>>
         var name = "Test User";
         var password = "Test1234!";
 
-        // Get a cookie first
-        await client.GetAsync("/");
-        var playerId = GetPlayerIdFromCookie(client);
-        Assert.NotNull(playerId);
-
         // Act
-        var response = await client.PostAsync(
+
+        // Verify new user can access /register
+        await client.GetAsync("/register");
+
+        // Submit register form
+        var response = await client.PostAsJsonAsync<RegisterModel>(
             "/register",
-            new FormUrlEncodedContent(
-                new Dictionary<string, string>
-                {
-                    ["email"] = email,
-                    ["name"] = name,
-                    ["password"] = password,
-                }
-            )
+            new RegisterModel(email, name, password)
         );
+
+        var player = await _userManager.FindByEmailAsync(email);
 
         // Assert
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/", response.Headers.Location?.ToString());
-
-        var player = await _playerRepository.GetByIdAsync(playerId.Value);
         Assert.NotNull(player);
         Assert.Equal(email, player.Email);
-        Assert.Equal(name, player.Name);
-        Assert.True(_passwordHasher.VerifyPassword(player, password, player.PasswordHash!));
+        Assert.Equal(name, player.UserName);
+
+        Assert.True(await _userManager.CheckPasswordAsync(player!, password));
     }
 
     [Fact]
@@ -62,25 +62,23 @@ public class PlayerAuthTests : IClassFixture<WebApplicationFactory<Program>>
         // Arrange
         var client = _factory.CreateClient();
         var email = $"test_{Guid.NewGuid()}@example.com";
+        var password = "Test1234!";
 
         // Create first user
-        var firstPlayer = Player.Create(id: Guid.NewGuid(), email: email, name: "First User");
-        await _playerRepository.CreateAsync(firstPlayer);
-
-        // Get a cookie for second registration
-        await client.GetAsync("/");
+        await _userManager.CreateAsync(
+            new IdentityUser { UserName = "First Name", Email = email },
+            password
+        );
 
         // Act
-        var response = await client.PostAsync(
+
+        // Verify new user can access /register
+        await client.GetAsync("/register");
+
+        // Submit register form
+        var response = await client.PostAsJsonAsync<RegisterModel>(
             "/register",
-            new FormUrlEncodedContent(
-                new Dictionary<string, string>
-                {
-                    ["email"] = email,
-                    ["name"] = "Second User",
-                    ["password"] = "Test1234!",
-                }
-            )
+            new RegisterModel(email, "Second Name", password)
         );
 
         // Assert
@@ -95,31 +93,34 @@ public class PlayerAuthTests : IClassFixture<WebApplicationFactory<Program>>
         // Arrange
         var client = _factory.CreateClient();
         var email = $"test_{Guid.NewGuid()}@example.com";
+        var name = "Test User";
         var password = "Test1234!";
 
-        // Create and register a player
-        var player = Player.Create(
-            id: Guid.NewGuid(),
-            email: email,
-            name: "Test User",
-            passwordHash: _passwordHasher.HashPassword(Player.Create(), password)
+        // Verify new user can access /register
+        await client.GetAsync("/register");
+
+        // Submit register form
+        await client.PostAsJsonAsync<RegisterModel>(
+            "/register",
+            new RegisterModel(email, name, password)
         );
-        await _playerRepository.CreateAsync(player);
 
         // Act
-        var response = await client.PostAsync(
+        var response = await client.PostAsJsonAsync<LoginModel>(
             "/login",
-            new FormUrlEncodedContent(
-                new Dictionary<string, string> { ["email"] = email, ["password"] = password }
-            )
+            new LoginModel(email, password)
         );
 
         // Assert
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/", response.Headers.Location?.ToString());
 
-        var authenticatedPlayerId = GetPlayerIdFromCookie(client);
-        Assert.Equal(player.Id, authenticatedPlayerId);
+        var httpContext = _httpContextAccessor.HttpContext;
+        Assert.NotNull(httpContext);
+
+        var authenticatedPlayerId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var player = await _userManager.FindByEmailAsync(email);
+        Assert.Equal(player?.UserName, authenticatedPlayerId);
     }
 
     [Fact]
@@ -130,35 +131,14 @@ public class PlayerAuthTests : IClassFixture<WebApplicationFactory<Program>>
         var email = $"test_{Guid.NewGuid()}@example.com";
 
         // Act
-        var response = await client.PostAsync(
+        var response = await client.PostAsJsonAsync(
             "/login",
-            new FormUrlEncodedContent(
-                new Dictionary<string, string> { ["email"] = email, ["password"] = "wrongpassword" }
-            )
+            new LoginModel(email, "wrongpassword")
         );
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
         Assert.Contains("invalid email or password", content.ToLower());
-    }
-
-    private static Guid? GetPlayerIdFromCookie(HttpClient client)
-    {
-        var cookies = client
-            .DefaultRequestHeaders.GetValues("Cookie")
-            .SelectMany(c => c.Split(';'))
-            .Select(c => c.Trim().Split('='))
-            .ToDictionary(c => c[0], c => c[1]);
-
-        if (
-            cookies.TryGetValue("playerId", out var playerIdStr)
-            && Guid.TryParse(playerIdStr, out var playerId)
-        )
-        {
-            return playerId;
-        }
-
-        return null;
     }
 }

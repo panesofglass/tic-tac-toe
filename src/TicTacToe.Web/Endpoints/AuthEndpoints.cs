@@ -1,108 +1,13 @@
-using TicTacToe.Web.Infrastructure;
-using TicTacToe.Web.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
+using TicTacToe.Web.Models;
+
 namespace TicTacToe.Web.Endpoints;
 
 public static class AuthEndpoints
 {
-    internal static async Task<IResult> HandleRegistrationAsync(
-        HttpContext context,
-        IPlayerRepository players,
-        PasswordHasher passwordHasher,
-        string redirectUrl = "/")
-    {
-        var model = await RegisterModel.BindAsync(context);
-        if (model is null)
-        {
-            return Results.Extensions.RazorSlice<
-                Slices.Register,
-                (string Title, string Error)
-            >(("Register", "Invalid form data submitted"));
-        }
-
-        var validationResult = passwordHasher.ValidatePassword(model.Password);
-        if (!validationResult.IsValid)
-        {
-            return Results.Extensions.RazorSlice<
-                Slices.Register,
-                (string Title, string? Error)
-            >(("Register", validationResult.Error));
-        }
-
-        var existingPlayer = await players.GetByEmailAsync(model.Email);
-        if (existingPlayer != null)
-        {
-            return Results.Extensions.RazorSlice<
-                Slices.Register,
-                (string Title, string? Error)
-            >(("Register", "This email is already registered."));
-        }
-
-        var player = Player.Create();
-        var passwordHash = passwordHasher.HashPassword(player, model.Password);
-
-        try
-        {
-            var success = await players.RegisterPlayerAsync(
-                player.Id,
-                model.Email,
-                model.Name,
-                passwordHash
-            );
-
-            if (success)
-            {
-                player = await players.GetByIdAsync(player.Id);
-                if (player != null)
-                {
-                    // Create claims for the newly registered player
-                    var claims = new List<Claim>
-                    {
-                        new Claim(ClaimTypes.NameIdentifier, player.Id.ToString()),
-                        new Claim(ClaimTypes.Name, player.Name ?? string.Empty),
-                        new Claim("IsRegistered", "true"),
-                        new Claim("GamesPlayed", player.GamesPlayed.ToString()),
-                        new Claim("GamesWon", player.GamesWon.ToString())
-                    };
-
-                    // Add email claim if available
-                    if (!string.IsNullOrEmpty(player.Email))
-                    {
-                        claims.Add(new Claim(ClaimTypes.Email, player.Email));
-                    }
-
-                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                    var principal = new ClaimsPrincipal(identity);
-
-                    await context.SignInAsync(
-                        CookieAuthenticationDefaults.AuthenticationScheme,
-                        principal,
-                        new AuthenticationProperties
-                        {
-                            IsPersistent = true,
-                            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
-                        });
-                }
-                
-                return Results.Redirect(redirectUrl ?? "/");
-            }
-
-            return Results.Extensions.RazorSlice<
-                Slices.Register,
-                (string Title, string? Error)
-            >(("Register", "Registration failed. Please try again."));
-        }
-        catch (Exception ex)
-        {
-            return Results.Extensions.RazorSlice<
-                Slices.Register,
-                (string Title, string? Error)
-            >(("Register", $"Registration failed: {ex.Message}"));
-        }
-    }
-
     public static void MapAuth(this IEndpointRouteBuilder endpoints)
     {
         endpoints
@@ -120,10 +25,57 @@ public static class AuthEndpoints
                 "/register",
                 async (
                     HttpContext context,
-                    IPlayerRepository players,
-                    PasswordHasher passwordHasher,
-                    string redirectUrl = "/"
-                ) => await HandleRegistrationAsync(context, players, passwordHasher, redirectUrl)
+                    RegisterModel model,
+                    UserManager<IdentityUser> userManager,
+                    IUserStore<IdentityUser> userStore,
+                    SignInManager<IdentityUser> signInManager,
+                    IEmailSender _emailSender,
+                    ILogger<RegisterModel> logger,
+                    string returnUrl = "/"
+                ) =>
+                {
+                    if (model == default)
+                    {
+                        return Results.Extensions.RazorSlice<
+                            Slices.Login,
+                            (string Title, string? Error)
+                        >(("Register", "Invalid form data submitted"));
+                    }
+
+                    var user = new IdentityUser();
+
+                    await userStore.SetUserNameAsync(user, model.Name, CancellationToken.None);
+                    if (userManager.SupportsUserEmail)
+                    {
+                        var emailStore = (IUserEmailStore<IdentityUser>)userStore;
+                        await emailStore.SetEmailAsync(user, model.Email, CancellationToken.None);
+                    }
+                    var result = await userManager.CreateAsync(user, model.Password);
+                    if (result.Succeeded)
+                    {
+                        logger.LogInformation("User created a new account with password.");
+
+                        var userId = await userManager.GetUserIdAsync(user);
+
+                        // NOTE: ignoring email confirmation for now.
+
+                        await signInManager.SignInAsync(user, isPersistent: false);
+                        return Results.Redirect(returnUrl);
+                    }
+                    else
+                    {
+                        // TODO: return all field errors alongside their respective fields
+                        return Results.Extensions.RazorSlice<
+                            Slices.Register,
+                            (string Title, string? Error)
+                        >(
+                            (
+                                "Register",
+                                string.Join(", ", result.Errors.Select(e => e.Description))
+                            )
+                        );
+                    }
+                }
             )
             .AllowAnonymous();
 
@@ -142,13 +94,12 @@ public static class AuthEndpoints
                 "/login",
                 async (
                     HttpContext context,
-                    IPlayerRepository players,
-                    PasswordHasher passwordHasher,
+                    LoginModel model,
+                    SignInManager<IdentityUser> signInManager,
                     string returnUrl = "/"
                 ) =>
                 {
-                    var model = await LoginModel.BindAsync(context);
-                    if (model is null)
+                    if (model == default)
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Login,
@@ -156,50 +107,19 @@ public static class AuthEndpoints
                         >(("Login", "Invalid form data submitted"));
                     }
 
-                    var player = await players.GetByEmailAsync(model.Email);
-                    if (
-                        player == null
-                        || String.IsNullOrEmpty(player.PasswordHash) // This is for the case when the player.PasswordHash == null
-                        || !passwordHasher.VerifyPassword(
-                            player,
-                            model.Password,
-                            player.PasswordHash
-                        )
-                    )
+                    var result = await signInManager.PasswordSignInAsync(
+                        userName: model.Email,
+                        password: model.Password,
+                        isPersistent: false,
+                        lockoutOnFailure: false
+                    );
+                    if (!result.Succeeded)
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Login,
                             (string Title, string? Error)
                         >(("Login", "Invalid email or password."));
                     }
-
-                    // Create claims for the player
-                    var claims = new List<Claim>
-                    {
-                        new Claim(ClaimTypes.NameIdentifier, player.Id.ToString()),
-                        new Claim(ClaimTypes.Name, player.Name ?? string.Empty),
-                        new Claim("IsRegistered", player.IsRegistered.ToString()),
-                        new Claim("GamesPlayed", player.GamesPlayed.ToString()),
-                        new Claim("GamesWon", player.GamesWon.ToString())
-                    };
-
-                    // Add email claim if available
-                    if (!string.IsNullOrEmpty(player.Email))
-                    {
-                        claims.Add(new Claim(ClaimTypes.Email, player.Email));
-                    }
-
-                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                    var principal = new ClaimsPrincipal(identity);
-
-                    await context.SignInAsync(
-                        CookieAuthenticationDefaults.AuthenticationScheme,
-                        principal,
-                        new AuthenticationProperties
-                        {
-                            IsPersistent = true,
-                            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
-                        });
 
                     return Results.Redirect(returnUrl);
                 }

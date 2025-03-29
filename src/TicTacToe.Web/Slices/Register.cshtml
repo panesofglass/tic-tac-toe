@@ -16,9 +16,8 @@
         <div class="form-group">
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required 
-                   minlength="@PasswordHasher.MinPasswordLength" 
-                   maxlength="@PasswordHasher.MaxPasswordLength"
-                   pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$"
+                   minlength="6" 
+                   pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{6,}$"
                    title="Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character">
         </div>
         <button type="submit">Register</button>

@@ -42,9 +42,11 @@ public class PasswordHasher
         return _hasher.HashPassword(player, password);
     }
 
-    public bool VerifyPassword(Player player, string password, string hash)
+    public bool VerifyPassword(Player player, string password, string? hashedPassword)
     {
-        var result = _hasher.VerifyHashedPassword(player, hash, password);
+        if (hashedPassword == null)
+            return false;
+        var result = _hasher.VerifyHashedPassword(player, hashedPassword, password);
         return result != PasswordVerificationResult.Failed;
     }
 }

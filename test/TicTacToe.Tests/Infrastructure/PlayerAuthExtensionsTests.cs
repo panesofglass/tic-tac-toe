@@ -36,9 +36,9 @@ public class PlayerAuthExtensionsTests
         // Assert
         var cookie = _context.Response.Headers.SetCookie.ToString();
         Assert.Contains(playerId.ToString(), cookie);
-        Assert.Contains("SameSite=Strict", cookie);
-        Assert.Contains("HttpOnly", cookie);
-        Assert.Contains("Secure", cookie);
+        Assert.Contains("samesite=strict", cookie.ToLower());
+        Assert.Contains("httponly", cookie.ToLower());
+        Assert.Contains("secure", cookie.ToLower());
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class PlayerAuthExtensionsTests
 
         // Assert
         var cookie = _context.Response.Headers.SetCookie.ToString();
-        Assert.Contains("expires=Thu, 01 Jan 1970", cookie.ToLower());
+        Assert.Contains("expires=thu, 01 jan 1970", cookie.ToLower());
     }
 
     [Fact]

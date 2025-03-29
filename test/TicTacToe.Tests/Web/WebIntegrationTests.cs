@@ -45,7 +45,7 @@ public class WebIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         var game = await createResponse.Content.ReadFromJsonAsync<GameModel>();
         Assert.NotNull(game);
 
-        var move = new MoveModel((Position)4, Marker.X); // Center position
+        var move = new MoveModel(4, Marker.X); // Center position
 
         // Act
         var response = await client.PostAsync($"/game/{game.Id}", JsonContent.Create(move));
@@ -70,7 +70,7 @@ public class WebIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         var game = await createResponse.Content.ReadFromJsonAsync<GameModel>();
         Assert.NotNull(game);
 
-        var move = new MoveModel((Position)9, Marker.X); // Invalid position
+        var move = new MoveModel(9, Marker.X); // Invalid position
 
         // Act
         var response = await client.PostAsync($"/game/{game.Id}", JsonContent.Create(move));
@@ -84,7 +84,7 @@ public class WebIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     {
         // Arrange
         var client = _factory.CreateClient();
-        var move = new MoveModel((Position)4, Marker.X);
+        var move = new MoveModel(4, Marker.X);
 
         // Act
         var response = await client.PostAsync("/game/nonexistent", JsonContent.Create(move));
@@ -105,11 +105,11 @@ public class WebIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         // Make winning moves for X
         var winningMoves = new MoveModel[]
         {
-            new MoveModel((Position)0, Marker.X),
-            new MoveModel((Position)3, Marker.O),
-            new MoveModel((Position)1, Marker.X),
-            new MoveModel((Position)4, Marker.O),
-            new MoveModel((Position)2, Marker.X),
+            new MoveModel(0, Marker.X),
+            new MoveModel(3, Marker.O),
+            new MoveModel(1, Marker.X),
+            new MoveModel(4, Marker.O),
+            new MoveModel(2, Marker.X),
         };
         // Top row for X
         foreach (var move in winningMoves)
@@ -119,7 +119,7 @@ public class WebIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         }
 
         // Try to make another move after game is complete
-        var invalidMove = new MoveModel((Position)5, Marker.O);
+        var invalidMove = new MoveModel(5, Marker.O);
 
         // Act
         var response = await client.PostAsync($"/game/{game.Id}", JsonContent.Create(invalidMove));

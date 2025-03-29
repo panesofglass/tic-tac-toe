@@ -74,7 +74,9 @@ public static class GameEndpoints
             ) =>
             {
                 var game = await repo.GetGameAsync(id);
-                var updatedGame = game.WithMove(Move.Create(move.Position, move.Marker));
+                var updatedGame = game.WithMove(
+                    Move.Create(new Position(move.Position), move.Marker)
+                );
                 await repo.UpdateGameAsync(id, updatedGame);
 
                 // Send updated game state

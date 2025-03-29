@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using TicTacToe.Web.Infrastructure;
 
 namespace TicTacToe.Tests.Infrastructure;
@@ -6,7 +5,7 @@ namespace TicTacToe.Tests.Infrastructure;
 public class PasswordHasherTests
 {
     private readonly PasswordHasher _hasher = new();
-    private readonly Player _testPlayer = new() { Id = Guid.NewGuid() };
+    private readonly Player _testPlayer = Player.Create();
 
     [Theory]
     [InlineData("short", false, "must be at least 8 characters")]
@@ -17,7 +16,11 @@ public class PasswordHasherTests
     [InlineData("NoGoodPassword1!", true, null)]
     [InlineData("Test1234!@#$", true, null)]
     [InlineData("", false, "Password is required")]
-    public void ValidatePassword_ReturnsExpectedResult(string password, bool expectedValid, string? expectedError)
+    public void ValidatePassword_ReturnsExpectedResult(
+        string password,
+        bool expectedValid,
+        string? expectedError
+    )
     {
         // Act
         var result = _hasher.ValidatePassword(password);

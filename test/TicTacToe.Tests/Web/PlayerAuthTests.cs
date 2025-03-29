@@ -1,7 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using TicTacToe.Web.Infrastructure;
-using TicTacToe.Web.Models;
 
 namespace TicTacToe.Tests.Web;
 

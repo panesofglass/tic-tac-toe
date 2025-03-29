@@ -38,7 +38,7 @@ public class InMemoryGameRepositoryTests
     public async Task GetGame_ThrowsException_WhenGameNotFound()
     {
         await Assert.ThrowsAsync<GameNotFoundException>(
-            () => _repository.GetGameAsync("nonexistent-id")
+            () => _repository.GetGameAsync(Guid.NewGuid())
         );
     }
 

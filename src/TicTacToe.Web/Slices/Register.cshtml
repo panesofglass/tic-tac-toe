@@ -3,7 +3,7 @@
 
 <div class="register-form">
     <h2>Register</h2>
-  <form data-on-submit="@@post('/register')" @Html.DatastarValidationAttributes(Model.Error)>
+    <form data-on-submit="@@post('/register')" @Html.DatastarValidationAttributes(Model.Error)>
         @Html.DatastarValidationMessage(Model.Error)
         <div class="form-group">
             <label for="email">Email</label>
@@ -20,7 +20,7 @@
                    pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{6,}$"
                    title="Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character">
         </div>
-        <button type="submit">Register</button>
+        <button>Register</button>
     </form>
     <div class="form-footer">
         Already have an account? <a href="/login" data-on-click="@@navigate">Login</a>

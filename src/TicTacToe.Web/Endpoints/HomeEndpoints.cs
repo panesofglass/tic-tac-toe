@@ -14,13 +14,9 @@ public static class HomeEndpoints
             "/",
             async (IGameRepository gameRepository, HttpContext context) =>
             {
-                var player = await context.GetCurrentPlayerAsync();
                 var games = await gameRepository.GetGamesAsync();
                 var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
-                return Results.Extensions.RazorSlice<
-                    Slices.Index,
-                    (List<GameModel> Games, Player? Player)
-                >((model, player));
+                return Results.Extensions.RazorSlice<Slices.Index, List<GameModel>>(model);
             }
         );
 

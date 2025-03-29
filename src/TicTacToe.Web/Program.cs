@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using StarFederation.Datastar.DependencyInjection;
@@ -37,8 +38,11 @@ builder
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Strict;
-        options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.ReturnUrlParameter = "returnUrl";
+        options.SlidingExpiration = true;
     });
 
 // Configure repositories and services
@@ -46,6 +50,7 @@ builder
     .Services.AddSingleton<IGameRepository, InMemoryGameRepository>()
     .AddSingleton<IPlayerRepository, InMemoryPlayerRepository>()
     .AddSingleton<IGamePlayerRepository, InMemoryGamePlayerRepository>()
+    .AddSingleton<IClaimsTransformation, PlayerClaimsTransformation>()
     .AddSingleton<PasswordHasher>()
     .ConfigureHttpJsonOptions(options =>
     {

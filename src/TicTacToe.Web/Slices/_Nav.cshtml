@@ -1,9 +1,9 @@
-@inherits RazorSlice<Player?>
+@inherits RazorSlice
 
 <nav class="main-nav">
-    @if (Model?.IsRegistered ?? false)
+    @if (HttpContext?.User?.IsRegistered() ?? false)
     {
-        <span>Welcome, @Model.Name!</span>
+        <span>Welcome, @(HttpContext.User!.GetPlayerName()!)</span>
         <form method="post" action="/logout" data-on-submit="@@post('/logout')">
             <button type="submit" class="nav-link">Logout</button>
         </form>

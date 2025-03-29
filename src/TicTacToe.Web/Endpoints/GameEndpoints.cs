@@ -15,13 +15,9 @@ public static class GameEndpoints
             "/focus/{id}",
             async (Guid id, IGameRepository repo, HttpContext context) =>
             {
-                var player = await context.GetCurrentPlayerAsync();
                 var game = await repo.GetGameAsync(id);
                 var model = GameModel.FromGame(id, game);
-                return Results.Extensions.RazorSlice<
-                    Slices.FocusGame,
-                    (GameModel Game, Player? Player)
-                >((model, player));
+                return Results.Extensions.RazorSlice<Slices.FocusGame, GameModel>(model);
             }
         );
 

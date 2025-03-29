@@ -1,13 +1,9 @@
-@inherits RazorSliceHttpResult<(GameModel Game, Player? Player)>
+@inherits RazorSliceHttpResult<GameModel>
 @implements IUsesLayout<_Layout, LayoutModel>
 
 <a href="/">Back to Games</a>
-@await RenderPartialAsync(Game.Create(Model.Game))
+@await RenderPartialAsync(Game.Create(Model))
 
 @functions {
-    public LayoutModel LayoutModel => new()
-    {
-        Title = $"Game {Model.Game.Id}",
-        CurrentPlayer = Model.Player
-    };
+    public LayoutModel LayoutModel => new($"Game {Model.Id}");
 }

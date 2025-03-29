@@ -21,9 +21,5 @@
 </div>
 
 @functions {
-    public LayoutModel LayoutModel => new()
-    {
-        Title = Model.Title,
-        CurrentPlayer = null
-    };
+    public LayoutModel LayoutModel => new(Model.Title);
 }

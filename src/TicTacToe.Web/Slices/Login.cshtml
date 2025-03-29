@@ -3,8 +3,8 @@
 
 <div class="login-form">
     <h2>Login</h2>
-    <form method="post" data-on-submit="@@post('/login')" @Html.ValidationAttributes(Model.Error)>
-        @Html.ValidationMessage(Model.Error)
+    <form method="post" data-on-submit="@@post('/login')" @Html.DatastarValidationAttributes(Model.Error)>
+        @Html.DatastarValidationMessage(Model.Error)
         <div class="form-group">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" required>

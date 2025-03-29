@@ -76,13 +76,7 @@ public class PlayerAuthExtensionsTests
     public async Task EnsurePlayerAsync_WhenValidCookie_ReturnsExistingPlayer()
     {
         // Arrange
-        var existingPlayer = new Player
-        {
-            Id = Guid.NewGuid(),
-            Name = "Test Player",
-            CreatedAt = DateTimeOffset.UtcNow,
-            LastActive = DateTimeOffset.UtcNow
-        };
+        var existingPlayer = Player.Create(id: Guid.NewGuid(), name: "Test Player");
         await _playerRepository.CreateAsync(existingPlayer);
         _context.SignInPlayer(existingPlayer.Id);
 
@@ -95,7 +89,7 @@ public class PlayerAuthExtensionsTests
 
         // Assert
         Assert.Equal(existingPlayer.Id, playerId);
-        Assert.Empty(newContext.Response.Headers.SetCookie); // Shouldn't set a new cookie
+        Assert.True(string.IsNullOrEmpty(newContext.Response.Headers.SetCookie)); // Shouldn't set a new cookie
     }
 
     [Fact]

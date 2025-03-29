@@ -32,7 +32,7 @@
     </style>
 </head>
 <body>
-    @await RenderPartialAsync(Slices._Nav.Create(Model.CurrentPlayer))
+    @await RenderPartialAsync(_Nav.Create(Model.CurrentPlayer))
 
     <h1>@Model.Title</h1>
     <main id="root">

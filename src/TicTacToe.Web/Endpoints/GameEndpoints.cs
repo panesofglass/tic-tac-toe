@@ -12,18 +12,22 @@ public static class GameEndpoints
     {
         // Full game page
         endpoints.MapGet(
-            "/game/{id}",
-            async (Guid id, IGameRepository repo) =>
+            "/focus/{id}",
+            async (Guid id, IGameRepository repo, HttpContext context) =>
             {
+                var player = await context.GetCurrentPlayerAsync();
                 var game = await repo.GetGameAsync(id);
                 var model = GameModel.FromGame(id, game);
-                return Results.Extensions.RazorSlice<Slices.Game, GameModel>(model);
+                return Results.Extensions.RazorSlice<
+                    Slices.FocusGame,
+                    (GameModel Game, Player? Player)
+                >((model, player));
             }
         );
 
         // Game state fragment with SSE
         endpoints.MapGet(
-            "/page/game/{id}",
+            "/game/{id}",
             async (Guid id, IGameRepository repo, IDatastarServerSentEventService sse) =>
             {
                 var game = await repo.GetGameAsync(id);

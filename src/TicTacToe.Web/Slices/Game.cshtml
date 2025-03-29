@@ -6,7 +6,7 @@
         {
             @for (byte col = 0; col < 3; col++)
             {
-                var position = new Position(row, col);
+                var position = Engine.Position.At(row, col);
                 var marker = Model.Board[row * 3 + col];
                 <div class="cell">
                     @if (marker.HasValue)

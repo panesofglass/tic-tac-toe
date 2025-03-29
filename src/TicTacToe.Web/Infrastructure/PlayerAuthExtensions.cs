@@ -70,8 +70,7 @@ public static class PlayerAuthExtensions
         }
 
         // Create a new player and set the cookie
-        var newPlayer = Player.Create();
-        await playerRepository.CreateAsync(newPlayer);
+        var newPlayer = await playerRepository.CreateAsync(Player.Create());
         context.SignInPlayer(newPlayer.Id);
         return newPlayer.Id;
     }

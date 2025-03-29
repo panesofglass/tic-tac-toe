@@ -26,11 +26,13 @@ namespace TicTacToe.Web.Infrastructure
             if (string.IsNullOrEmpty(error))
                 return HtmlString.Empty;
 
-            return new HtmlString($@"
+            return new HtmlString(
+                $@"
                 <div class='validation-message' role='alert' data-error-message>
                     {HttpUtility.HtmlEncode(error)}
                 </div>
-            ");
+            "
+            );
         }
     }
 }

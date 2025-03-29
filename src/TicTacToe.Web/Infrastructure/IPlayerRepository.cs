@@ -47,22 +47,24 @@ namespace TicTacToe.Web.Infrastructure
         /// Factory method to create a new Player.
         /// </summary>
         public static Player Create(
-            Guid? id = null,
-            string? name = null,
-            string? email = null,
-            string? passwordHash = null
+            Guid? id = default,
+            string? name = default,
+            string? email = default,
+            string? passwordHash = default
         )
         {
             var now = DateTimeOffset.UtcNow;
             return new Player(
-                id ?? Guid.NewGuid(),
-                name ?? $"Player_{Guid.NewGuid().ToString().Substring(0, 8)}",
-                email,
-                passwordHash,
-                now,
-                now,
-                0,
-                0
+                Id: id.HasValue && id.Value != Guid.Empty ? id.Value : Guid.NewGuid(),
+                Name: !String.IsNullOrEmpty(name)
+                    ? name
+                    : $"Player_{Guid.NewGuid().ToString().Substring(0, 8)}",
+                Email: email,
+                PasswordHash: passwordHash,
+                CreatedAt: now,
+                LastActive: now,
+                GamesPlayed: 0,
+                GamesWon: 0
             );
         }
     }

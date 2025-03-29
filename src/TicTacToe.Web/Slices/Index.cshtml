@@ -1,12 +1,12 @@
-@inherits RazorSlice<List<GameModel>>
+@inherits RazorSliceHttpResult<(List<GameModel> Games, Player? Player)>
 @implements IUsesLayout<_Layout, LayoutModel>
 
-@await RenderPartialAsync(GameList.Create(Model))
+@await RenderPartialAsync(GameList.Create(Model.Games))
 
 @functions {
     public LayoutModel LayoutModel => new()
     {
         Title = "Games",
-        CurrentPlayer = await Context.GetCurrentPlayerAsync()
+        CurrentPlayer = Model.Player
     };
 }

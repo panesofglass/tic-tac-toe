@@ -12,17 +12,21 @@ public static class HomeEndpoints
         // Landing page HTML
         endpoints.MapGet(
             "/",
-            async (IGameRepository gameRepository) =>
+            async (IGameRepository gameRepository, HttpContext context) =>
             {
+                var player = await context.GetCurrentPlayerAsync();
                 var games = await gameRepository.GetGamesAsync();
                 var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
-                return Results.Extensions.RazorSlice<Slices.Index, List<GameModel>>(model);
+                return Results.Extensions.RazorSlice<
+                    Slices.Index,
+                    (List<GameModel> Games, Player? Player)
+                >((model, player));
             }
         );
 
         // Game list fragment with SSE
         endpoints.MapGet(
-            "/page",
+            "/games",
             async (IGameRepository repo, IDatastarServerSentEventService sse) =>
             {
                 var games = await repo.GetGamesAsync();

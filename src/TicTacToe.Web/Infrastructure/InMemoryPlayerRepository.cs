@@ -19,7 +19,7 @@ namespace TicTacToe.Web.Infrastructure
             {
                 return GetByIdAsync(id);
             }
-            return Task.FromResult<Player?>(null);
+            return Task.FromResult<Player?>(default);
         }
 
         public Task<IEnumerable<Player>> GetAllAsync()
@@ -29,20 +29,16 @@ namespace TicTacToe.Web.Infrastructure
 
         public Task<Player> CreateAsync(Player player)
         {
-            if (player == null)
+            if (player == default)
                 throw new ArgumentNullException(nameof(player));
 
-            if (player.Id == Guid.Empty)
-                player.Id = Guid.NewGuid();
-
-            if (string.IsNullOrEmpty(player.Name))
-                player.Name = $"Player_{player.Id.ToString().Substring(0, 8)}";
-
-            var now = DateTimeOffset.UtcNow;
-            player.CreatedAt = now;
-            player.LastActive = now;
-            player.GamesPlayed = 0;
-            player.GamesWon = 0;
+            // Treat the received player as a template and ensure it is created properly
+            var newPlayer = Player.Create(
+                id: player.Id,
+                name: player.Name,
+                email: player.Email,
+                passwordHash: player.PasswordHash
+            );
 
             // Check for email uniqueness if provided
             if (!string.IsNullOrEmpty(player.Email))
@@ -65,14 +61,13 @@ namespace TicTacToe.Web.Infrastructure
 
         public Task<bool> UpdateAsync(Player player)
         {
-            if (player == null)
+            if (player == default)
                 throw new ArgumentNullException(nameof(player));
 
             if (player.Id == Guid.Empty)
                 throw new ArgumentException("Player Id cannot be empty", nameof(player));
 
-            var result = _players.TryGetValue(player.Id, out var existingPlayer);
-            if (!result)
+            if (!_players.TryGetValue(player.Id, out var existingPlayer))
                 return Task.FromResult(false);
 
             // Handle email updates
@@ -96,11 +91,14 @@ namespace TicTacToe.Web.Infrastructure
             }
 
             // Preserve creation time and stats
-            player.CreatedAt = existingPlayer.CreatedAt;
-            player.GamesPlayed = existingPlayer.GamesPlayed;
-            player.GamesWon = existingPlayer.GamesWon;
+            var updatePlayer = player with
+            {
+                CreatedAt = existingPlayer.CreatedAt,
+                GamesPlayed = existingPlayer.GamesPlayed,
+                GamesWon = existingPlayer.GamesWon,
+            };
 
-            result = _players.TryUpdate(player.Id, player, existingPlayer);
+            var result = _players.TryUpdate(player.Id, player, existingPlayer);
             return Task.FromResult(result);
         }
 
@@ -119,7 +117,10 @@ namespace TicTacToe.Web.Infrastructure
                 return Task.FromResult(Enumerable.Empty<Player>());
 
             var matchingPlayers = _players
-                .Values.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+                .Values.Where(p =>
+                    !String.IsNullOrEmpty(p.Name)
+                    && p.Name.Contains(name, StringComparison.OrdinalIgnoreCase)
+                )
                 .ToList();
 
             return Task.FromResult(matchingPlayers.AsEnumerable());

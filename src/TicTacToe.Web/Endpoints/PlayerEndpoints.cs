@@ -1,5 +1,5 @@
 using TicTacToe.Web.Infrastructure;
-using static TicTacToe.Web.Models.AuthModels;
+using TicTacToe.Web.Models;
 
 namespace TicTacToe.Web.Endpoints;
 
@@ -55,7 +55,7 @@ public static class PlayerEndpoints
                     >(("Register", "This email is already registered."));
                 }
 
-                var player = new Player(Id: playerId.Value);
+                var player = Player.Create(id: playerId.Value);
                 var passwordHash = passwordHasher.HashPassword(player, model.Password);
 
                 try

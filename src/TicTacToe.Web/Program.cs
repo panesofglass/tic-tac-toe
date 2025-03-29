@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StarFederation.Datastar.DependencyInjection;
@@ -25,12 +24,8 @@ builder
     .Services.AddDbContext<TicTacToeIdentityDbContext>(options =>
         options.UseInMemoryDatabase("Identity")
     )
-    .AddAuthorization(options =>
-    {
-        options.FallbackPolicy = new AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .Build();
-    })
+    .AddAuthorization()
+    .AddAntiforgery()
     .AddIdentityApiEndpoints<IdentityUser>()
     .AddEntityFrameworkStores<TicTacToeIdentityDbContext>();
 
@@ -73,6 +68,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 // app.MapIdentityApi<IdentityUser>();
 

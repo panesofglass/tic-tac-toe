@@ -3,7 +3,7 @@
 
 <div class="register-form">
     <h2>Register</h2>
-    <form method="post" data-on-submit="@@post('/register')" @Html.DatastarValidationAttributes(Model.Error)>
+  <form data-on-submit="@@post('/register')" @Html.DatastarValidationAttributes(Model.Error)>
         @Html.DatastarValidationMessage(Model.Error)
         <div class="form-group">
             <label for="email">Email</label>

@@ -41,7 +41,7 @@ builder
         options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
         options.LoginPath = "/login";
         options.LogoutPath = "/logout";
-        options.ReturnUrlParameter = "returnUrl";
+        options.ReturnUrlParameter = "redirectUrl";
         options.SlidingExpiration = true;
     });
 

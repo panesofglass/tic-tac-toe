@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Engine;
 using TicTacToe.Web.Endpoints;
@@ -15,22 +17,42 @@ builder.WebHost.UseKestrelHttpsConfiguration();
 #endif
 
 // Add datastar services
-builder.Services.AddAuthorization();
-builder.Services.AddDatastar();
-builder.Services.AddWebEncoders();
+builder.Services.AddWebEncoders().AddDatastar();
+
+// Configure auth
+builder
+    .Services.AddAuthorization(options =>
+    {
+        options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+    })
+    .AddAuthentication(options =>
+    {
+        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    })
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "playerId";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
+    });
 
 // Configure repositories and services
-builder.Services.AddSingleton<IGameRepository, InMemoryGameRepository>();
-builder.Services.AddSingleton<IPlayerRepository, InMemoryPlayerRepository>();
-builder.Services.AddSingleton<IGamePlayerRepository, InMemoryGamePlayerRepository>();
-builder.Services.AddSingleton<PasswordHasher>();
-
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.TypeInfoResolverChain.Insert(0, TicTacToeJsonContext.Default);
-    // Type parameter is required for AOT compilation support
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<Marker>());
-});
+builder
+    .Services.AddSingleton<IGameRepository, InMemoryGameRepository>()
+    .AddSingleton<IPlayerRepository, InMemoryPlayerRepository>()
+    .AddSingleton<IGamePlayerRepository, InMemoryGamePlayerRepository>()
+    .AddSingleton<PasswordHasher>()
+    .ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.TypeInfoResolverChain.Insert(0, TicTacToeJsonContext.Default);
+        // Type parameter is required for AOT compilation support
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<Marker>());
+    });
 
 var app = builder.Build();
 
@@ -44,12 +66,13 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Map endpoints
+app.MapAuth();
 app.MapHome();
 app.MapGame();
-app.MapPlayer();
 
 Console.WriteLine(
     $"RuntimeFeature.IsDynamicCodeSupported = {RuntimeFeature.IsDynamicCodeSupported}"

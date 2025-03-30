@@ -1,0 +1,20 @@
+@inherits RazorSlice<(string Title, string? Error)>
+
+<div id="login-form" class="login-form">
+    <h2>Login</h2>
+    <form data-signals="{email: '', password: ''}" data-on-submit="@@post('/login')" @Html.DatastarValidationAttributes(Model.Error)>
+        @Html.DatastarValidationMessage(Model.Error)
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" data-bind="email" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" data-bind="password" required>
+        </div>
+        <button type="submit">Login</button>
+    </form>
+    <div class="form-footer">
+        Don't have an account? <a href="/register">Register</a>
+    </div>
+</div>

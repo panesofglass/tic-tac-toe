@@ -4,15 +4,15 @@
     @if (HttpContext?.User?.Identity?.IsAuthenticated ?? false)
     {
         <span>Welcome, @(HttpContext.User.Identity.Name!)</span>
-        <form method="post" action="/logout" data-on-submit="@@post('/logout')">
+        <form data-on-submit="@@post('/logout')">
             <button type="submit" class="nav-link">Logout</button>
         </form>
     }
     else
     {
         <div class="auth-links">
-            <a href="/login" data-on-click="@@navigate">Login</a>
-            <a href="/register" data-on-click="@@navigate">Register</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
         </div>
     }
 </nav>

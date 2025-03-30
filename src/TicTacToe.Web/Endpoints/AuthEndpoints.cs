@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
+using RazorSlices;
+using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Web.Models;
 
 namespace TicTacToe.Web.Endpoints;
@@ -23,56 +24,42 @@ public static class AuthEndpoints
             async (
                 HttpContext context,
                 RegisterModel model,
-                UserManager<IdentityUser> userManager,
-                IUserStore<IdentityUser> userStore,
-                SignInManager<IdentityUser> signInManager,
-                IEmailSender _emailSender,
+                IDatastarServerSentEventService sse,
                 ILogger<IEndpointRouteBuilder> logger,
                 string returnUrl = "/"
             ) =>
             {
-                logger.LogInformation("RYANTEST: Register form submitted");
                 if (model == default)
                 {
-                    logger.LogError("RYANTEST: Invalid form data submitted");
-                    return Results.Extensions.RazorSlice<
-                        Slices.Login,
-                        (string Title, string? Error)
-                    >(("Register", "Invalid form data submitted"));
+                    var slice = Slices._RegisterForm.Create(
+                        ("Register", "Invalid form data submitted")
+                    );
+                    var fragment = await slice.RenderAsync();
+                    await sse.MergeFragmentsAsync(fragment);
                 }
 
                 var user = new IdentityUser();
 
-                logger.LogInformation($"RYANTEST: setting user name {model.Name}");
-                await userStore.SetUserNameAsync(user, model.Name, CancellationToken.None);
-                if (userManager.SupportsUserEmail)
-                {
-                    var emailStore = (IUserEmailStore<IdentityUser>)userStore;
-                    await emailStore.SetEmailAsync(user, model.Email, CancellationToken.None);
-                }
-                logger.LogInformation("RYANTEST: creating user");
                 var result = await userManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
                     logger.LogInformation("RYANTEST: User created a new account with password.");
-
                     var userId = await userManager.GetUserIdAsync(user);
-
                     // NOTE: ignoring email confirmation for now.
-
                     logger.LogInformation("RYANTEST: Signing in.");
                     await signInManager.SignInAsync(user, isPersistent: false);
                     logger.LogInformation("RYANTEST: User signed in.");
-                    return Results.Redirect(returnUrl);
+                    await sse.ExecuteScriptAsync($"""window.location.href = "{returnUrl}";""");
                 }
                 else
                 {
                     logger.LogError($"RYANTEST: Errors: ${result.Errors}");
                     // TODO: return all field errors alongside their respective fields
-                    return Results.Extensions.RazorSlice<
-                        Slices.Register,
-                        (string Title, string? Error)
-                    >(("Register", string.Join(", ", result.Errors.Select(e => e.Description))));
+                    var slice = Slices._RegisterForm.Create(
+                        ("Register", string.Join(", ", result.Errors.Select(e => e.Description)))
+                    );
+                    var fragment = await slice.RenderAsync();
+                    await sse.MergeFragmentsAsync(fragment);
                 }
             }
         );
@@ -90,16 +77,16 @@ public static class AuthEndpoints
             async (
                 HttpContext context,
                 LoginModel model,
-                SignInManager<IdentityUser> signInManager,
+                IDatastarServerSentEventService sse,
+                ILogger<IEndpointRouteBuilder> logger,
                 string returnUrl = "/"
             ) =>
             {
                 if (model != default)
                 {
-                    return Results.Extensions.RazorSlice<
-                        Slices.Login,
-                        (string Title, string? Error)
-                    >(("Login", "Invalid form data submitted"));
+                    var slice = Slices._LoginForm.Create(("Login", "Invalid form data submitted"));
+                    var fragment = await slice.RenderAsync();
+                    await sse.MergeFragmentsAsync(fragment);
                 }
 
                 var result = await signInManager.PasswordSignInAsync(
@@ -108,25 +95,25 @@ public static class AuthEndpoints
                     isPersistent: false,
                     lockoutOnFailure: false
                 );
+
                 if (!result.Succeeded)
                 {
-                    return Results.Extensions.RazorSlice<
-                        Slices.Login,
-                        (string Title, string? Error)
-                    >(("Login", "Invalid email or password."));
+                    var slice = Slices._LoginForm.Create(("Login", "Invalid email or password."));
+                    var fragment = await slice.RenderAsync();
+                    await sse.MergeFragmentsAsync(fragment);
                 }
 
-                return Results.Redirect(returnUrl);
+                await sse.ExecuteScriptAsync($"""window.location.href = "{returnUrl}";""");
             }
         );
 
         endpoints
             .MapPost(
                 "/logout",
-                async (HttpContext context) =>
+                async (HttpContext context, IDatastarServerSentEventService sse) =>
                 {
                     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    return Results.Redirect("/");
+                    await sse.MergeFragmentsAsync("""window.location.href = "/login";""");
                 }
             )
             .RequireAuthorization();

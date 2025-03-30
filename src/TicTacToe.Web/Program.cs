@@ -39,7 +39,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
     options.LoginPath = "/login";
     options.LogoutPath = "/logout";
-    options.ReturnUrlParameter = "redirectUrl";
+    options.ReturnUrlParameter = "returnUrl";
     options.SlidingExpiration = true;
 });
 

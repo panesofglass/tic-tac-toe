@@ -30,7 +30,7 @@ public static class HomeEndpoints
                 {
                     var games = await repo.GetGamesAsync();
                     var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
-                    var slice = Slices.GameList.Create(model);
+                    var slice = Slices._GameList.Create(model);
                     var fragment = await slice.RenderAsync();
                     await sse.MergeFragmentsAsync(fragment);
                 }

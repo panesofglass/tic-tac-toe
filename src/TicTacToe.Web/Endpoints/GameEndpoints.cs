@@ -31,7 +31,7 @@ public static class GameEndpoints
                 {
                     var game = await repo.GetGameAsync(id);
                     var model = GameModel.FromGame(id, game);
-                    var slice = Slices.Game.Create(model);
+                    var slice = Slices._Game.Create(model);
                     var fragment = await slice.RenderAsync();
                     await sse.MergeFragmentsAsync(fragment);
                 }
@@ -52,15 +52,13 @@ public static class GameEndpoints
                     var model = GameModel.FromGame(id, game);
 
                     // Also notify the game list that it needs to update
-                    var listSlice = Slices.GameList.Create(
+                    var listSlice = Slices._GameList.Create(
                         (await repo.GetGamesAsync())
                             .Select(g => GameModel.FromGame(g.id, g.game))
                             .ToList()
                     );
                     var listFragment = await listSlice.RenderAsync();
                     await sse.MergeFragmentsAsync(listFragment);
-
-                    return Results.Redirect($"/game/{id}");
                 }
             )
             .RequireAuthorization();
@@ -84,18 +82,18 @@ public static class GameEndpoints
 
                     // Send updated game state
                     var model = GameModel.FromGame(id, updatedGame);
-                    var slice = Slices.Game.Create(model);
+                    var slice = Slices._Game.Create(model);
                     var fragment = await slice.RenderAsync();
                     await sse.MergeFragmentsAsync(fragment);
 
                     // Also update game list if game is complete
                     if (model.IsComplete)
                     {
-                        var listSlice = Slices.GameList.Create(
-                            (await repo.GetGamesAsync())
-                                .Select(g => GameModel.FromGame(g.id, g.game))
-                                .ToList()
-                        );
+                        var games = await repo.GetGamesAsync();
+                        var listModel = games
+                            .Select(g => GameModel.FromGame(g.id, g.game))
+                            .ToList();
+                        var listSlice = Slices._GameList.Create(listModel);
                         var listFragment = await listSlice.RenderAsync();
                         await sse.MergeFragmentsAsync(listFragment);
                     }

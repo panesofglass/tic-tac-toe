@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Mvc;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
 
@@ -26,14 +25,13 @@ public static class AuthEndpoints
                 "/register",
                 async (
                     HttpContext context,
-                    [FromForm] RegisterModel model,
                     PasswordHasher passwordHasher,
                     IPlayerRepository playerRepository,
                     ILogger<Slices.Register> logger,
                     string returnUrl = "/"
                 ) =>
                 {
-                    if (model == default)
+                    if (!RegisterModel.TryBind(context, out var model))
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Register,
@@ -98,14 +96,13 @@ public static class AuthEndpoints
                 "/login",
                 async (
                     HttpContext context,
-                    [FromForm] LoginModel model,
                     PasswordHasher passwordHasher,
                     IPlayerRepository playerRepository,
                     ILogger<Slices.Login> logger,
                     string returnUrl = "/"
                 ) =>
                 {
-                    if (model == default)
+                    if (!LoginModel.TryBind(context, out var model))
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Login,

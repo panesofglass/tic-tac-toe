@@ -5,12 +5,12 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace TicTacToe.Web.Slices
 {
-    public static class DatastarExtensions
+    public static class HtmlExtensions
     {
         /// <summary>
-        /// Renders validation data attributes for datastar forms
+        /// Renders validation data attributes for forms
         /// </summary>
-        public static IHtmlContent DatastarValidationAttributes(
+        public static IHtmlContent FormValidationAttributes(
             this IHtmlHelper html,
             string? error = null
         ) =>
@@ -23,7 +23,7 @@ namespace TicTacToe.Web.Slices
         /// <summary>
         /// Renders an error message with datastar attributes
         /// </summary>
-        public static IHtmlContent DatastarValidationMessage(
+        public static IHtmlContent FormValidationMessage(
             this IHtmlHelper html,
             string? error = null
         ) =>
@@ -33,7 +33,7 @@ namespace TicTacToe.Web.Slices
                     $"""<div class='validation-message' role='alert' data-error-message>{HttpUtility.HtmlEncode(error)}</div>"""
                 );
 
-        public static IHtmlContent DatastarAntiforgeryToken(
+        public static IHtmlContent FormAntiforgeryToken(
             this IHtmlHelper html,
             AntiforgeryTokenSet token
         ) =>

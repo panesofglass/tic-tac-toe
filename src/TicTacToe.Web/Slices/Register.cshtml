@@ -4,9 +4,9 @@
 
 <div id="register-form" class="register-form">
     <h2>Register</h2>
-    <form method="post" action="/register" @Html.DatastarValidationAttributes(Model.Error)>
-        @Html.DatastarAntiforgeryToken(Token)
-        @Html.DatastarValidationMessage(Model.Error)
+    <form method="post" action="/register" @Html.FormValidationAttributes(Model.Error)>
+        @Html.FormAntiforgeryToken(Token)
+        @Html.FormValidationMessage(Model.Error)
         <div class="form-group">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" required>

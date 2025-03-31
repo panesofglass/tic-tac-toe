@@ -1,0 +1,232 @@
+# LLM Instructions for Tic-Tac-Toe Project
+
+## 1. RazorSlices Patterns
+
+### Component Structure
+- Prefix partial views with underscore (e.g., _Game.cshtml, _Nav.cshtml)
+- Use descriptive, PascalCase names for full pages (e.g., FocusGame.cshtml)
+- Inherit from appropriate base classes:
+  * RazorSlice<TModel> for partial views
+  * RazorSliceHttpResult<TModel> for full pages
+  * RazorLayoutSlice<TModel> for layouts
+
+### Layout Implementation
+```cshtml
+@inherits RazorSliceHttpResult<TModel>
+@implements IUsesLayout<_Layout, LayoutModel>
+
+@functions {
+    public LayoutModel LayoutModel => new("Page Title");
+}
+```
+
+### Partial Views
+- Keep components focused on a single responsibility
+- Use Model tuples for complex data: `@inherits RazorSlice<(Guid Id, Engine.Game Game)>`
+- Leverage RenderPartialAsync for composing views:
+```cshtml
+@await RenderPartialAsync(_Game.Create(Model))
+```
+
+## 2. Datastar.js Integration
+
+### Hypermedia Controls
+- Use data-* attributes for interactive elements:
+  * data-on-click: Handle click events
+  * data-params: Pass parameters to endpoints
+  * data-connect: Set up SSE connections
+
+### Common Patterns
+```cshtml
+<!-- POST request with parameters -->
+<div
+    data-on-click="@@post('/endpoint')"
+    data-params='{ "param": "value" }'>
+</div>
+
+<!-- Navigation -->
+<a href="/path" data-on-click="@@navigate">Link Text</a>
+
+<!-- Real-time updates -->
+<div data-connect="@@sse:/updates">
+    <!-- Content updated via SSE -->
+</div>
+```
+
+### State Management
+- Use server-sent events (SSE) for real-time updates
+- Render state-dependent UI conditionally
+- Keep client-side state minimal
+- Rely on server-side validation
+
+## 3. Game State & Validation
+
+### State Transitions
+- Game states are managed through the Engine.Game class
+- States: InProgress, Winner, Draw
+- Use pattern matching for state-specific rendering:
+```cshtml
+@switch (Model.Game)
+{
+    case Game.Winner winner:
+        <p>Game Over! @winner.WinningPlayer wins!</p>
+        break;
+    case Game.Draw:
+        <p>Game Over! It's a draw!</p>
+        break;
+    case Game.InProgress:
+        <p>Current player: @Model.Game.GetCurrentMarker()</p>
+        break;
+}
+```
+
+### Move Validation
+- Validate moves server-side in Game.WithMove()
+- Check for:
+  * Valid position
+  * Player's turn
+  * Game not complete
+89|- Handle concurrent moves through repository pattern
+
+### Engine Implementation
+
+#### Core Types
+- Position (0-8):
+  * Represents board position using zero-based index
+  * Layout:
+    0 1 2
+    3 4 5
+    6 7 8
+  * Validates range (0-8)
+  * Provides Row/Column conversion
+
+- Marker (X, O):
+  * Simple enum representing player markers
+  * Used for move tracking and win detection
+
+- Square:
+  * Discriminated union pattern using records
+  * Two states:
+    - Taken(Marker): Position claimed by a player
+    - Available(NextMarker): Open position showing next player
+
+- Move:
+  * Immutable record struct
+  * Contains Position, Marker, and Timestamp
+  * Validates position range on creation
+
+#### GameBoard Implementation
+- Immutable collection of 9 squares
+- Implements IEnumerable<Square>
+- Move validation:
+  * Checks if position is available
+  * Verifies correct player turn
+- Updates available positions with next marker
+
+#### Game State Machine
+- Base abstract record class
+- Three concrete states:
+  * InProgress(Board, Moves)
+  * Winner(Board, WinningPlayer, Moves)
+  * Draw(Board, Moves)
+- Transition rules:
+  * WithMove(): Only valid in InProgress state
+  * Automatic transition to Winner when win detected
+  * Automatic transition to Draw when board full
+- Win detection:
+  * Checks 8 winning combinations
+  * Row wins (3)
+  * Column wins (3)
+  * Diagonal wins (2)
+
+#### State Reconstruction
+- Games can be recreated from move history
+- Two reconstruction methods:
+  * FromMoves(): Replays moves to build state
+  * FromBoard(): Directly evaluates board state
+- Ensures move validation during replay
+
+### Implementation Guidelines
+
+1. State Updates
+   - Never modify existing state
+   - Create new instances for all changes
+   - Use ImmutableArray for collections
+   - Validate state transitions
+
+2. Move Processing
+   - Validate move before applying
+   - Check current state allows moves
+   - Verify position is available
+   - Confirm correct player turn
+
+3. Error Handling
+   - ArgumentException for invalid positions
+   - InvalidOperationException for completed games
+   - ArgumentOutOfRangeException for invalid indices
+   - Clear error messages for debugging
+
+4. Pattern Matching
+   - Use switch expressions for state checks
+   - Pattern match on Square variants
+   - Handle all possible game states
+   - Leverage C# 12 features
+
+## 4. Project Conventions
+
+### Code Organization
+- /src
+  * TicTacToe.Engine/: Core game logic
+  * TicTacToe.Web/: Web application
+    - Endpoints/: HTTP endpoints
+    - Infrastructure/: Services, repositories
+    - Models/: View models
+    - Slices/: Razor components
+
+### Naming Conventions
+- PascalCase for types, methods, public members
+- camelCase for parameters, local variables
+- Prefix partial views with underscore
+- Suffix service interfaces with 'Service'
+- Use descriptive names that reflect purpose
+
+### Code Style
+- Use C# 12 features where appropriate
+- Prefer immutable types (records)
+- Enable nullable reference types
+- Follow progressive enhancement for HTML/CSS
+- Keep components focused and maintainable
+
+### Authentication
+- Use cookie authentication
+- Implement secure, HTTP-only cookies
+- Include anti-forgery tokens in forms
+- Protect endpoints with authorization attributes
+- Track player context in claims
+
+## Review Checklist
+
+1. Component Structure
+   - [ ] Proper base class inheritance
+   - [ ] Correct model types
+   - [ ] Layout implementation if needed
+   - [ ] Partial view composition
+
+2. Interactivity
+   - [ ] Appropriate data-* attributes
+   - [ ] Correct endpoint URLs
+   - [ ] Parameter formatting
+   - [ ] SSE configuration if needed
+
+3. State Management
+   - [ ] Proper state transitions
+   - [ ] Server-side validation
+   - [ ] Concurrency handling
+   - [ ] Error scenarios covered
+
+4. Code Quality
+   - [ ] Follows naming conventions
+   - [ ] Implements security measures
+   - [ ] Maintains immutability
+   - [ ] Includes proper documentation
+

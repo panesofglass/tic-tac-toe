@@ -49,7 +49,6 @@ builder
     .AddSingleton<PasswordHasher>()
     .ConfigureHttpJsonOptions(options =>
     {
-        options.SerializerOptions.TypeInfoResolverChain.Insert(0, TicTacToeJsonContext.Default);
         // Type parameter is required for AOT compilation support
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<Marker>());
     });

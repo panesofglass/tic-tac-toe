@@ -2,7 +2,6 @@ using RazorSlices;
 using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Engine;
 using TicTacToe.Web.Infrastructure;
-using TicTacToe.Web.Models;
 
 namespace TicTacToe.Web.Endpoints;
 
@@ -42,17 +41,38 @@ public static class GameEndpoints
         // Make a move
         endpoints
             .MapPost(
-                "/game/{id}",
+                "/game/{id}/{position}",
                 async (
                     Guid id,
-                    MoveModel move,
+                    byte position,
+                    HttpContext context,
                     IGameRepository repo,
+                    IGamePlayerRepository gamePlayerRepository,
+                    IPlayerRepository playerRepository,
                     IDatastarServerSentEventService sse
                 ) =>
                 {
+                    var playerId = context.User.GetPlayerId();
+                    if (!playerId.HasValue)
+                    {
+                        throw new UnauthorizedAccessException(message: "User must be logged in.");
+                    }
+
+                    var playerMarker = await gamePlayerRepository.GetMarkerByPlayerAsync(
+                        id,
+                        playerId.Value
+                    );
+                    if (!playerMarker.HasValue)
+                    {
+                        throw new ArgumentException(
+                            "Player is not registered for this game.",
+                            nameof(id)
+                        );
+                    }
+
                     var game = await repo.GetGameAsync(id);
                     var updatedGame = game.WithMove(
-                        Move.Create(new Position(move.Position), move.Marker)
+                        Move.Create(new Position(position), playerMarker.Value)
                     );
                     await repo.UpdateGameAsync(id, updatedGame);
 

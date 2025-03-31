@@ -41,7 +41,7 @@ public static class GameExtensions
         {
             Square.Taken taken => new HtmlString(playerMarker.ToString()),
             Square.Available available when available.NextMarker == playerMarker => new HtmlString(
-                $"""<div class="cell" data-on-click="@@post('/game/{gameId}?position={position}&marker={playerMarker.ToString()}')"></div>"""
+                $"""<div class="cell" data-on-click="@@post('/game/{gameId}/{position}')"></div>"""
             ),
             _ => new HtmlString(""),
         };

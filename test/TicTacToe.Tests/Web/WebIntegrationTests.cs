@@ -28,7 +28,7 @@ public class WebIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var game = await response.Content.ReadFromJsonAsync<GameModel>();
         Assert.NotNull(game);
-        Assert.NotNull(game.Id);
+        Assert.NotEqual(game.Id, Guid.Empty);
         Assert.Equal(9, game.Board.Length);
         Assert.All(game.Board, square => Assert.Null(square));
         Assert.Equal(Marker.X, game.CurrentPlayer);

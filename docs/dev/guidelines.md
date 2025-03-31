@@ -26,15 +26,22 @@
    - Follow MinimalAPI patterns
    - Use RazorSlices for components
    - Keep endpoints thin, logic in services
-   - Use session state for player identity
+   - Use cookie authentication for player identity
    - Render game state based on player context
 
-3. Player Management
-   - Simple session-based identity
-   - Track player-to-marker assignments per game
-   - Validate moves against player identity
-   - Keep player management separate from game logic
-   - Use middleware for session handling
+3. Authentication and Player Management
+   - Cookie Authentication
+     * Use secure, HTTP-only cookies for authentication
+     * Implement password hashing using modern algorithms
+     * Include anti-forgery tokens in all forms
+     * Protect endpoints with authorization attributes
+     * Handle unauthorized access with login redirects
+   
+   - Player Context
+     * Track player-to-marker assignments per game
+     * Validate moves against authenticated player identity
+     * Keep player management separate from game logic
+     * Use claims-based identity for player information
 
 ## Testing
 
@@ -43,7 +50,7 @@
    - Integration tests for web features
    - Test both success and failure cases
    - Test player interactions and turn order
-   - Validate session management
+   - Validate authentication and authorization
 
 2. Test Organization
    - Mirror source structure in tests
@@ -57,8 +64,8 @@
    - XML comments on public APIs
    - README.md for project overview
    - Keep docs/ up to date
-   - Document player management flows
-   - Include session handling details
+   - Document authentication flows
+   - Include security configuration details
 
 2. Commit Messages
    - Use present tense

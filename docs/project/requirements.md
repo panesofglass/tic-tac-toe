@@ -39,10 +39,49 @@
    - Server-rendered HTML
    - SSE for updates
    - Move validation
-   - Session persistence
 
 4. Quality Requirements
    - Comprehensive test coverage
    - Error handling and logging
    - Documentation
    - Type safety
+
+5. Authentication Requirements
+   - Forms-based Authentication
+     * Login and registration with email/password
+     * Password hashing with modern algorithms
+     * Form validation and error handling
+   
+   - Session Management
+     * 20-minute sliding expiration
+     * Automatic session extension on activity
+     * Secure logout functionality
+   
+   - Security Measures
+     * Secure, HTTP-only cookies
+     * Strict same-site policy enforcement
+     * Anti-forgery token protection
+     * HTTPS-only communication
+   
+   - Access Control
+     * Protected endpoint authorization
+     * Login redirect for unauthorized access
+     * Clear error messages for auth failures
+
+## API Design
+
+1. Authentication Endpoints
+   - POST /login
+     * Authenticates user credentials
+     * Returns to previous page on success
+     * Shows error messages on failure
+   
+   - POST /register
+     * Creates new user account
+     * Validates email and password
+     * Auto-login on successful registration
+   
+   - POST /logout
+     * Invalidates current session
+     * Requires authentication
+     * Redirects to login page

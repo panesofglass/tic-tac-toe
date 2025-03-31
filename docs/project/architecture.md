@@ -29,6 +29,21 @@
    - Unit tests for game logic
    - Integration tests for web functionality
 
+4. Authentication
+   - Cookie-based authentication using ASP.NET Core Identity
+   - Authentication flow:
+     * Forms-based login/register with password hashing
+     * Claims-based identity storing NameIdentifier, Name, and Email
+     * Automatic redirects to login for protected endpoints
+     * Sign-out invalidates the authentication cookie
+   
+   - Cookie configuration:
+     * Secure-only (HTTPS required)
+     * HTTP-only (no JavaScript access)
+     * 20-minute sliding expiration
+     * Strict same-site policy
+     * Anti-forgery token protection
+
 ## Data Flow
 
 1. User Interaction

@@ -1,12 +1,12 @@
-@inherits RazorSliceHttpResult<(string Title, string? Error)>
+@inherits RazorSliceHttpResult<string?>
 @implements IUsesLayout<_Layout, LayoutModel>
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 
 <div id="register-form" class="register-form">
     <h2>Register</h2>
-    <form method="post" action="/register" @Html.FormValidationAttributes(Model.Error)>
+    <form method="post" action="/register" @Html.FormValidationAttributes(Model)>
         @Html.FormAntiforgeryToken(Token)
-        @Html.FormValidationMessage(Model.Error)
+        @Html.FormValidationMessage(Model)
         <div class="form-group">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" required>
@@ -31,6 +31,6 @@
 </div>
 
 @functions {
-    public LayoutModel LayoutModel => new(Model.Title);
+    public LayoutModel LayoutModel => new("Register");
     public AntiforgeryTokenSet Token => Antiforgery.GetAndStoreTokens(HttpContext!);
 }

@@ -14,9 +14,7 @@ public static class AuthEndpoints
             .MapGet(
                 "/register",
                 (HttpContext context, string? error = null) =>
-                    Results.Extensions.RazorSlice<Slices.Register, (string Title, string? Error)>(
-                        ("Register", error)
-                    )
+                    Results.Extensions.RazorSlice<Slices.Register, string?>(error)
             )
             .AllowAnonymous();
 
@@ -33,19 +31,17 @@ public static class AuthEndpoints
                 {
                     if (!RegisterModel.TryBind(context, out var model))
                     {
-                        return Results.Extensions.RazorSlice<
-                            Slices.Register,
-                            (string Title, string? Error)
-                        >(("Register", "Invalid form data submitted."));
+                        return Results.Extensions.RazorSlice<Slices.Register, string?>(
+                            "Invalid form data submitted."
+                        );
                     }
 
                     var result = passwordHasher.ValidatePassword(model.Password);
                     if (!result.IsValid)
                     {
-                        return Results.Extensions.RazorSlice<
-                            Slices.Register,
-                            (string Title, string? Error)
-                        >(("Register", result.Error));
+                        return Results.Extensions.RazorSlice<Slices.Register, string?>(
+                            result.Error
+                        );
                     }
 
                     var tempPlayer = Player.Create(
@@ -69,10 +65,7 @@ public static class AuthEndpoints
                     }
                     catch (Exception ex)
                     {
-                        return Results.Extensions.RazorSlice<
-                            Slices.Register,
-                            (string Title, string? Error)
-                        >(("Register", ex.Message));
+                        return Results.Extensions.RazorSlice<Slices.Register, string?>(ex.Message);
                     }
                 }
             )
@@ -82,12 +75,7 @@ public static class AuthEndpoints
             .MapGet(
                 "/login",
                 (HttpContext context, string? error = null) =>
-                {
-                    return Results.Extensions.RazorSlice<
-                        Slices.Login,
-                        (string Title, string? Error)
-                    >(("Login", error));
-                }
+                    Results.Extensions.RazorSlice<Slices.Login, string?>(error)
             )
             .AllowAnonymous();
 
@@ -104,19 +92,17 @@ public static class AuthEndpoints
                 {
                     if (!LoginModel.TryBind(context, out var model))
                     {
-                        return Results.Extensions.RazorSlice<
-                            Slices.Login,
-                            (string Title, string? Error)
-                        >(("Login", "Invalid form data submitted."));
+                        return Results.Extensions.RazorSlice<Slices.Login, string?>(
+                            "Invalid form data submitted."
+                        );
                     }
 
                     var player = await playerRepository.GetByEmailAsync(model.Email);
                     if (player == default || !passwordHasher.VerifyPassword(player, model.Password))
                     {
-                        return Results.Extensions.RazorSlice<
-                            Slices.Login,
-                            (string Title, string? Error)
-                        >(("Login", "Invalid email or password."));
+                        return Results.Extensions.RazorSlice<Slices.Login, string?>(
+                            "Invalid email or password."
+                        );
                     }
 
                     await context.SignInAsync(

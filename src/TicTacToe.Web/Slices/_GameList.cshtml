@@ -1,6 +1,6 @@
-@inherits RazorSlice<List<GameModel>>
+@inherits RazorSlice<List<(Guid Id, Engine.Game Game)>>
 
-<div data-connect="@@sse:/page">
+<div data-on-load="@@get('/games')">
     <h2>Active Games</h2>
     @if (!Model.Any())
     {
@@ -12,27 +12,21 @@
             @foreach (var game in Model)
             {
                 <li>
-                    <a href="/game/@(game.Id)" data-on-click="@@navigate">
-                        Game @(game.Id) 
-                        @if (game.IsComplete)
+                    <a href="/focus/@(game.Id)">
+                        Game @(game.Id)
+                        @game.Game switch
                         {
-                            <span>
-                                (@(game.Winner.HasValue ? $"{game.Winner.Value} Won!" : "Draw!"))
-                            </span>
-                        }
-                        else
-                        {
-                            <span>(Current player: @game.CurrentPlayer)</span>
+                            Game.InProgress g => <span>Current player: @g.GetCurrentPlayer()</span>,
+                            Game.Winner g => <span>@g.WinningPlayer Won!</span>,
+                            Game.Draw g => <span>Draw!</span>,
+                            _ => <span></span>
                         }
                     </a>
                 </li>
             }
         </ul>
     }
-    <button 
-        type="button"
-        data-on-click="@@post('/game')"
-        data-params='{ "marker": "X" }'>
+    <button type="button" data-on-click="@@post('/games')">
         Start New Game
     </button>
 </div>

@@ -1,4 +1,4 @@
-@inherits RazorSliceHttpResult<List<GameModel>>
+@inherits RazorSliceHttpResult<List<Engine.Game>>
 @implements IUsesLayout<_Layout, LayoutModel>
 
 @await RenderPartialAsync(_GameList.Create(Model))

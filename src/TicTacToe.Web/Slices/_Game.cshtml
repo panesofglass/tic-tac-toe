@@ -1,4 +1,4 @@
-@inherits RazorSlice<GameModel>
+@inherits RazorSlice<(Guid Id, Engine.Game Game)>
 
 <div>
     <div id="board-@(Model.Id)" class="game-board">
@@ -18,7 +18,7 @@
                         <div
                             class="cell"
                             data-on-click="@@post('/game/@(Model.Id)')"
-                            data-params='{ "position": @(row * 3 + col), "marker": "@Model.CurrentPlayer" }'>
+                            data-params='{ "position": @(row * 3 + col), "marker": "@(Model.Game.GetCurrentPlayer)" }'>
                             &nbsp;
                         </div>
                     }
@@ -42,7 +42,7 @@
         }
         else
         {
-            <p>Current Player: @Model.CurrentPlayer</p>
+            <p>Current Player: @(Model.Game.GetCurrentPlayer())</p>
         }
     </div>
 </div>

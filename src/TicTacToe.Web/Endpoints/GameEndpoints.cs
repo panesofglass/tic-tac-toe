@@ -17,8 +17,10 @@ public static class GameEndpoints
                 async (Guid id, IGameRepository repo, HttpContext context) =>
                 {
                     var game = await repo.GetGameAsync(id);
-                    var model = GameModel.FromGame(id, game);
-                    return Results.Extensions.RazorSlice<Slices.FocusGame, GameModel>(model);
+                    return Results.Extensions.RazorSlice<
+                        Slices.FocusGame,
+                        (Guid Id, Engine.Game Game)
+                    >((id, game));
                 }
             )
             .RequireAuthorization();
@@ -30,35 +32,9 @@ public static class GameEndpoints
                 async (Guid id, IGameRepository repo, IDatastarServerSentEventService sse) =>
                 {
                     var game = await repo.GetGameAsync(id);
-                    var model = GameModel.FromGame(id, game);
-                    var slice = Slices._Game.Create(model);
+                    var slice = Slices._Game.Create((id, game));
                     var fragment = await slice.RenderAsync();
                     await sse.MergeFragmentsAsync(fragment);
-                }
-            )
-            .RequireAuthorization();
-
-        // Create new game
-        endpoints
-            .MapPost(
-                "/game",
-                async (
-                    IGameRepository repo,
-                    IDatastarServerSentEventService sse,
-                    HttpContext context
-                ) =>
-                {
-                    var (id, game) = await repo.CreateGameAsync();
-                    var model = GameModel.FromGame(id, game);
-
-                    // Also notify the game list that it needs to update
-                    var listSlice = Slices._GameList.Create(
-                        (await repo.GetGamesAsync())
-                            .Select(g => GameModel.FromGame(g.id, g.game))
-                            .ToList()
-                    );
-                    var listFragment = await listSlice.RenderAsync();
-                    await sse.MergeFragmentsAsync(listFragment);
                 }
             )
             .RequireAuthorization();
@@ -81,19 +57,21 @@ public static class GameEndpoints
                     await repo.UpdateGameAsync(id, updatedGame);
 
                     // Send updated game state
-                    var model = GameModel.FromGame(id, updatedGame);
-                    var slice = Slices._Game.Create(model);
+                    var slice = Slices._Game.Create((id, updatedGame));
                     var fragment = await slice.RenderAsync();
                     await sse.MergeFragmentsAsync(fragment);
 
                     // Also update game list if game is complete
-                    if (model.IsComplete)
+                    if (
+                        updatedGame switch
+                        {
+                            Game.InProgress => false,
+                            _ => true,
+                        }
+                    )
                     {
                         var games = await repo.GetGamesAsync();
-                        var listModel = games
-                            .Select(g => GameModel.FromGame(g.id, g.game))
-                            .ToList();
-                        var listSlice = Slices._GameList.Create(listModel);
+                        var listSlice = Slices._GameList.Create(games.ToList());
                         var listFragment = await listSlice.RenderAsync();
                         await sse.MergeFragmentsAsync(listFragment);
                     }

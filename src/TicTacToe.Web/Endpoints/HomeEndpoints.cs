@@ -1,7 +1,6 @@
 using RazorSlices;
 using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Web.Infrastructure;
-using TicTacToe.Web.Models;
 
 namespace TicTacToe.Web.Endpoints;
 
@@ -16,8 +15,10 @@ public static class HomeEndpoints
                 async (IGameRepository gameRepository, HttpContext context) =>
                 {
                     var games = await gameRepository.GetGamesAsync();
-                    var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
-                    return Results.Extensions.RazorSlice<Slices.Index, List<GameModel>>(model);
+                    return Results.Extensions.RazorSlice<
+                        Slices.Index,
+                        List<(Guid Id, Engine.Game Game)>
+                    >(games.ToList());
                 }
             )
             .RequireAuthorization();
@@ -29,10 +30,33 @@ public static class HomeEndpoints
                 async (IGameRepository repo, IDatastarServerSentEventService sse) =>
                 {
                     var games = await repo.GetGamesAsync();
-                    var model = games.Select(g => GameModel.FromGame(g.id, g.game)).ToList();
-                    var slice = Slices._GameList.Create(model);
+                    var slice = Slices._GameList.Create(games.ToList());
                     var fragment = await slice.RenderAsync();
                     await sse.MergeFragmentsAsync(fragment);
+                }
+            )
+            .RequireAuthorization();
+
+        // Create new game
+        endpoints
+            .MapPost(
+                "/games",
+                async (
+                    IGameRepository repo,
+                    IDatastarServerSentEventService sse,
+                    HttpContext context
+                ) =>
+                {
+                    var (id, game) = await repo.CreateGameAsync();
+                    var slice = Slices._Game.Create((id, game));
+                    var fragment = await slice.RenderAsync();
+                    await sse.MergeFragmentsAsync(fragment);
+
+                    // Also notify the game list that it needs to update
+                    var games = await repo.GetGamesAsync();
+                    var listSlice = Slices._GameList.Create(games.ToList());
+                    var listFragment = await listSlice.RenderAsync();
+                    await sse.MergeFragmentsAsync(listFragment);
                 }
             )
             .RequireAuthorization();

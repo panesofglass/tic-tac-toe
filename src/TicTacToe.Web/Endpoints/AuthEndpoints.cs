@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +14,10 @@ public static class AuthEndpoints
         endpoints
             .MapGet(
                 "/register",
-                (HttpContext context, IAntiforgery antiforgery, string? error = null) =>
-                    Results.Extensions.RazorSlice<
-                        Slices.Register,
-                        (string Title, AntiforgeryTokenSet Token, string? Error)
-                    >(("Register", antiforgery.GetAndStoreTokens(context), error))
+                (HttpContext context, string? error = null) =>
+                    Results.Extensions.RazorSlice<Slices.Register, (string Title, string? Error)>(
+                        ("Register", error)
+                    )
             )
             .AllowAnonymous();
 
@@ -29,39 +27,29 @@ public static class AuthEndpoints
                 async (
                     HttpContext context,
                     [FromForm] RegisterModel model,
-                    IAntiforgery antiforgery,
                     PasswordHasher passwordHasher,
                     IPlayerRepository playerRepository,
                     ILogger<Slices.Register> logger,
                     string returnUrl = "/"
                 ) =>
                 {
-                    logger.LogInformation("RYANTEST: Registering new user");
                     if (model == default)
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Register,
-                            (string Title, AntiforgeryTokenSet Token, string? Error)
-                        >(
-                            (
-                                "Register",
-                                antiforgery.GetAndStoreTokens(context),
-                                "Invalid form data submitted"
-                            )
-                        );
+                            (string Title, string? Error)
+                        >(("Register", "Invalid form data submitted."));
                     }
 
-                    logger.LogInformation("RYANTEST: Validating password");
                     var result = passwordHasher.ValidatePassword(model.Password);
                     if (!result.IsValid)
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Register,
-                            (string Title, AntiforgeryTokenSet Token, string? Error)
-                        >(("Register", antiforgery.GetAndStoreTokens(context), result.Error));
+                            (string Title, string? Error)
+                        >(("Register", result.Error));
                     }
 
-                    logger.LogInformation("RYANTEST: Creating user");
                     var tempPlayer = Player.Create(
                         email: model.Email,
                         name: model.Name,
@@ -74,7 +62,6 @@ public static class AuthEndpoints
                     try
                     {
                         await playerRepository.CreateAsync(player);
-                        logger.LogInformation("RYANTEST: Created user and signing in ...");
 
                         await context.SignInAsync(
                             CookieAuthenticationDefaults.AuthenticationScheme,
@@ -86,8 +73,8 @@ public static class AuthEndpoints
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Register,
-                            (string Title, AntiforgeryTokenSet Token, string? Error)
-                        >(("Register", antiforgery.GetAndStoreTokens(context), ex.Message));
+                            (string Title, string? Error)
+                        >(("Register", ex.Message));
                     }
                 }
             )
@@ -96,13 +83,12 @@ public static class AuthEndpoints
         endpoints
             .MapGet(
                 "/login",
-                (HttpContext context, IAntiforgery antiforgery, string? error = null) =>
+                (HttpContext context, string? error = null) =>
                 {
-                    var token = antiforgery.GetAndStoreTokens(context);
                     return Results.Extensions.RazorSlice<
                         Slices.Login,
-                        (string Title, AntiforgeryTokenSet Token, string? Error)
-                    >(("Login", token, error));
+                        (string Title, string? Error)
+                    >(("Login", error));
                 }
             )
             .AllowAnonymous();
@@ -113,25 +99,18 @@ public static class AuthEndpoints
                 async (
                     HttpContext context,
                     [FromForm] LoginModel model,
-                    IAntiforgery antiforgery,
                     PasswordHasher passwordHasher,
                     IPlayerRepository playerRepository,
                     ILogger<Slices.Login> logger,
                     string returnUrl = "/"
                 ) =>
                 {
-                    if (model != default)
+                    if (model == default)
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Login,
-                            (string Title, AntiforgeryTokenSet Token, string? Error)
-                        >(
-                            (
-                                "Login",
-                                antiforgery.GetAndStoreTokens(context),
-                                "Invalid form data submitted"
-                            )
-                        );
+                            (string Title, string? Error)
+                        >(("Login", "Invalid form data submitted."));
                     }
 
                     var player = await playerRepository.GetByEmailAsync(model.Email);
@@ -139,14 +118,8 @@ public static class AuthEndpoints
                     {
                         return Results.Extensions.RazorSlice<
                             Slices.Login,
-                            (string Title, AntiforgeryTokenSet Token, string? Error)
-                        >(
-                            (
-                                "Login",
-                                antiforgery.GetAndStoreTokens(context),
-                                "Invalid email or password."
-                            )
-                        );
+                            (string Title, string? Error)
+                        >(("Login", "Invalid email or password."));
                     }
 
                     await context.SignInAsync(

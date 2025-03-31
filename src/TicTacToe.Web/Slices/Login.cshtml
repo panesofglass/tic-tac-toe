@@ -1,4 +1,4 @@
-@inherits RazorSliceHttpResult<(string Title, string? Error)>
+@inherits RazorSliceHttpResult<(string Title, AntiforgeryTokenSet Token, string? Error)>
 @implements IUsesLayout<_Layout, LayoutModel>
 
 @await RenderPartialAsync(_LoginForm.Create(Model))

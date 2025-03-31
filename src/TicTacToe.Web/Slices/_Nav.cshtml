@@ -4,7 +4,7 @@
     @if (HttpContext?.User?.Identity?.IsAuthenticated ?? false)
     {
         <span>Welcome, @(HttpContext.User.Identity.Name!)</span>
-        <form data-on-submit="@@post('/logout')">
+        <form method="post" action="/logout">
             <button type="submit" class="nav-link">Logout</button>
         </form>
     }

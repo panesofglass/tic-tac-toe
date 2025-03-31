@@ -1,8 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using RazorSlices;
-using StarFederation.Datastar.DependencyInjection;
+using Microsoft.AspNetCore.Mvc;
 using TicTacToe.Web.Infrastructure;
 using TicTacToe.Web.Models;
 
@@ -15,10 +15,11 @@ public static class AuthEndpoints
         endpoints
             .MapGet(
                 "/register",
-                (HttpContext context, string? error = null) =>
-                    Results.Extensions.RazorSlice<Slices.Register, (string Title, string? Error)>(
-                        ("Register", error)
-                    )
+                (HttpContext context, IAntiforgery antiforgery, string? error = null) =>
+                    Results.Extensions.RazorSlice<
+                        Slices.Register,
+                        (string Title, AntiforgeryTokenSet Token, string? Error)
+                    >(("Register", antiforgery.GetAndStoreTokens(context), error))
             )
             .AllowAnonymous();
 
@@ -27,32 +28,40 @@ public static class AuthEndpoints
                 "/register",
                 async (
                     HttpContext context,
-                    RegisterModel model,
+                    [FromForm] RegisterModel model,
+                    IAntiforgery antiforgery,
                     PasswordHasher passwordHasher,
                     IPlayerRepository playerRepository,
-                    IDatastarServerSentEventService sse,
-                    ILogger<IEndpointRouteBuilder> logger,
+                    ILogger<Slices.Register> logger,
                     string returnUrl = "/"
                 ) =>
                 {
+                    logger.LogInformation("RYANTEST: Registering new user");
                     if (model == default)
                     {
-                        var slice = Slices._RegisterForm.Create(
-                            ("Register", "Invalid form data submitted")
+                        return Results.Extensions.RazorSlice<
+                            Slices.Register,
+                            (string Title, AntiforgeryTokenSet Token, string? Error)
+                        >(
+                            (
+                                "Register",
+                                antiforgery.GetAndStoreTokens(context),
+                                "Invalid form data submitted"
+                            )
                         );
-                        var fragment = await slice.RenderAsync();
-                        await sse.MergeFragmentsAsync(fragment);
                     }
 
+                    logger.LogInformation("RYANTEST: Validating password");
                     var result = passwordHasher.ValidatePassword(model.Password);
                     if (!result.IsValid)
                     {
-                        // TODO: return all field errors alongside their respective fields
-                        var slice = Slices._RegisterForm.Create(("Register", result.Error));
-                        var fragment = await slice.RenderAsync();
-                        await sse.MergeFragmentsAsync(fragment);
+                        return Results.Extensions.RazorSlice<
+                            Slices.Register,
+                            (string Title, AntiforgeryTokenSet Token, string? Error)
+                        >(("Register", antiforgery.GetAndStoreTokens(context), result.Error));
                     }
 
+                    logger.LogInformation("RYANTEST: Creating user");
                     var tempPlayer = Player.Create(
                         email: model.Email,
                         name: model.Name,
@@ -65,19 +74,20 @@ public static class AuthEndpoints
                     try
                     {
                         await playerRepository.CreateAsync(player);
+                        logger.LogInformation("RYANTEST: Created user and signing in ...");
 
                         await context.SignInAsync(
                             CookieAuthenticationDefaults.AuthenticationScheme,
                             CreateClaimsPrincipal(player)
                         );
-                        await sse.ExecuteScriptAsync($"""window.location.href = "{returnUrl}";""");
+                        return Results.Redirect(returnUrl);
                     }
-                    catch (InvalidOperationException ex)
+                    catch (Exception ex)
                     {
-                        // TODO: return all field errors alongside their respective fields
-                        var slice = Slices._RegisterForm.Create(("Register", ex.Message));
-                        var fragment = await slice.RenderAsync();
-                        await sse.MergeFragmentsAsync(fragment);
+                        return Results.Extensions.RazorSlice<
+                            Slices.Register,
+                            (string Title, AntiforgeryTokenSet Token, string? Error)
+                        >(("Register", antiforgery.GetAndStoreTokens(context), ex.Message));
                     }
                 }
             )
@@ -86,10 +96,14 @@ public static class AuthEndpoints
         endpoints
             .MapGet(
                 "/login",
-                (HttpContext context, string? error = null) =>
-                    Results.Extensions.RazorSlice<Slices.Login, (string Title, string? Error)>(
-                        ("Login", error)
-                    )
+                (HttpContext context, IAntiforgery antiforgery, string? error = null) =>
+                {
+                    var token = antiforgery.GetAndStoreTokens(context);
+                    return Results.Extensions.RazorSlice<
+                        Slices.Login,
+                        (string Title, AntiforgeryTokenSet Token, string? Error)
+                    >(("Login", token, error));
+                }
             )
             .AllowAnonymous();
 
@@ -98,32 +112,41 @@ public static class AuthEndpoints
                 "/login",
                 async (
                     HttpContext context,
-                    LoginModel model,
+                    [FromForm] LoginModel model,
+                    IAntiforgery antiforgery,
                     PasswordHasher passwordHasher,
                     IPlayerRepository playerRepository,
-                    IDatastarServerSentEventService sse,
-                    ILogger<IEndpointRouteBuilder> logger,
+                    ILogger<Slices.Login> logger,
                     string returnUrl = "/"
                 ) =>
                 {
                     if (model != default)
                     {
-                        var slice = Slices._LoginForm.Create(
-                            ("Login", "Invalid form data submitted")
+                        return Results.Extensions.RazorSlice<
+                            Slices.Login,
+                            (string Title, AntiforgeryTokenSet Token, string? Error)
+                        >(
+                            (
+                                "Login",
+                                antiforgery.GetAndStoreTokens(context),
+                                "Invalid form data submitted"
+                            )
                         );
-                        var fragment = await slice.RenderAsync();
-                        await sse.MergeFragmentsAsync(fragment);
                     }
 
                     var player = await playerRepository.GetByEmailAsync(model.Email);
                     if (player == default || !passwordHasher.VerifyPassword(player, model.Password))
                     {
-                        var slice = Slices._LoginForm.Create(
-                            ("Login", "Invalid email or password.")
+                        return Results.Extensions.RazorSlice<
+                            Slices.Login,
+                            (string Title, AntiforgeryTokenSet Token, string? Error)
+                        >(
+                            (
+                                "Login",
+                                antiforgery.GetAndStoreTokens(context),
+                                "Invalid email or password."
+                            )
                         );
-                        var fragment = await slice.RenderAsync();
-                        await sse.MergeFragmentsAsync(fragment);
-                        return;
                     }
 
                     await context.SignInAsync(
@@ -131,7 +154,7 @@ public static class AuthEndpoints
                         CreateClaimsPrincipal(player)
                     );
 
-                    await sse.ExecuteScriptAsync($"""window.location.href = "{returnUrl}";""");
+                    return Results.Redirect(returnUrl);
                 }
             )
             .AllowAnonymous();
@@ -139,10 +162,10 @@ public static class AuthEndpoints
         endpoints
             .MapPost(
                 "/logout",
-                async (HttpContext context, IDatastarServerSentEventService sse) =>
+                async (HttpContext context) =>
                 {
                     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    await sse.MergeFragmentsAsync("""window.location.href = "/login";""");
+                    return Results.Redirect("/login");
                 }
             )
             .RequireAuthorization();

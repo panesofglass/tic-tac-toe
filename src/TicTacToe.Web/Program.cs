@@ -2,7 +2,6 @@ using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
 using StarFederation.Datastar.DependencyInjection;
 using TicTacToe.Engine;
 using TicTacToe.Web.Endpoints;
@@ -22,12 +21,8 @@ builder.Services.AddWebEncoders().AddDatastar();
 
 // Configure auth
 builder
-    .Services.AddAuthorization(options =>
-    {
-        options.FallbackPolicy = new AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .Build();
-    })
+    .Services.AddAuthorization()
+    .AddAntiforgery()
     .AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -73,6 +68,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 // Map endpoints
 app.MapAuth();

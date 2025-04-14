@@ -1,0 +1,54 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TicTacToe.Engine", "src\TicTacToe.Engine\TicTacToe.Engine.fsproj", "{07AC7339-6193-4136-A80A-986F3A9A2679}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TicTacToe.Web", "src\TicTacToe.Web\TicTacToe.Web.fsproj", "{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Debug|x64.Build.0 = Debug|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Debug|x86.Build.0 = Debug|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Release|x64.ActiveCfg = Release|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Release|x64.Build.0 = Release|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Release|x86.ActiveCfg = Release|Any CPU
+		{07AC7339-6193-4136-A80A-986F3A9A2679}.Release|x86.Build.0 = Release|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Debug|x64.Build.0 = Debug|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Debug|x86.Build.0 = Debug|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Release|x64.ActiveCfg = Release|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Release|x64.Build.0 = Release|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Release|x86.ActiveCfg = Release|Any CPU
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{07AC7339-6193-4136-A80A-986F3A9A2679} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{52A056B2-B7A4-4514-9C4C-EE95B5FAAB09} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+	EndGlobalSection
+EndGlobal

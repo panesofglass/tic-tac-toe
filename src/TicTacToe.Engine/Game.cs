@@ -48,9 +48,31 @@ public abstract record Game
         }
 
         var inProgressGame = (InProgress)this;
-        var nextBoard = inProgressGame.Board.WithMove(move);
+
+        // Simulate the move to check if it ends the game
         var moves = inProgressGame.Moves.Add(move);
-        return FromBoard(nextBoard, moves);
+        var nextBoard = inProgressGame.Board.WithMove(move);
+        var willEndGame = HasWinner(nextBoard, move.Marker) || IsDraw(nextBoard);
+        if (willEndGame)
+        {
+            // Apply the move with willEndGame flag set appropriately
+            nextBoard = inProgressGame.Board.WithMove(move, willEndGame);
+        }
+
+        // Check if this move results in a win
+        if (HasWinner(nextBoard, move.Marker))
+        {
+            return new Winner(nextBoard, move.Marker, moves);
+        }
+
+        // Check if this move results in a draw
+        if (IsDraw(nextBoard))
+        {
+            return new Draw(nextBoard, moves);
+        }
+
+        // Game continues
+        return new InProgress(nextBoard, moves);
     }
 
     /// <summary>
@@ -68,8 +90,8 @@ public abstract record Game
     /// <summary>
     /// Returns true if all positions are filled and there is no winner.
     /// </summary>
-    private static bool IsDraw(GameBoard board, ImmutableArray<Move> moves) =>
-        board.All(space => space is Square.Taken)
+    private static bool IsDraw(GameBoard board) =>
+        board.All(space => space is Square.Taken or Square.Unavailable)
         && !HasWinner(board, Marker.X)
         && !HasWinner(board, Marker.O);
 
@@ -81,30 +103,57 @@ public abstract record Game
     /// <summary>
     /// Creates a game from a sequence of moves.
     /// </summary>
-    public static Game FromBoard(GameBoard board, ImmutableArray<Move> moves)
+    public static Game FromMoves(IEnumerable<Move> moves)
     {
         // Build board step by step to validate moves against board state
         var moveArray = moves.ToImmutableArray();
 
-        if (HasWinner(board, Marker.X))
-            return new Winner(board, Marker.X, moveArray);
+        // Handle empty move array
+        if (moveArray.Length == 0)
+        {
+            return Create();
+        }
 
-        if (HasWinner(board, Marker.O))
-            return new Winner(board, Marker.O, moveArray);
+        var board = GameBoard.Empty;
 
-        if (IsDraw(board, moveArray))
-            return new Draw(board, moveArray);
+        // Process all moves except the last one
+        if (moveArray.Length > 1)
+        {
+            foreach (var move in moveArray[..^1])
+            {
+                board = board.WithMove(move);
+            }
+        }
 
-        return new Game.InProgress(board, moveArray);
-    }
+        // Process the last move
+        var lastMove = moveArray[^1];
+        var nextBoard = board.WithMove(lastMove);
 
-    /// <summary>
-    /// Creates a game from a sequence of moves.
-    /// </summary>
-    public static Game FromMoves(IEnumerable<Move> moves)
-    {
-        // Build board step by step to validate moves against board state
-        var board = moves.Aggregate(GameBoard.Empty, (board, move) => board.WithMove(move));
-        return FromBoard(board, moves.ToImmutableArray());
+        // Check if the game has ended
+        var willEndGame =
+            HasWinner(nextBoard, Marker.X) || HasWinner(nextBoard, Marker.O) || IsDraw(nextBoard);
+
+        // If we have a last move and the game is ending, replay it with willEndGame = true
+        var finalBoard = willEndGame ? board.WithMove(lastMove, true) : nextBoard;
+
+        // Check for winner X
+        if (HasWinner(finalBoard, Marker.X))
+        {
+            return new Winner(finalBoard, Marker.X, moveArray);
+        }
+
+        // Check for winner O
+        if (HasWinner(finalBoard, Marker.O))
+        {
+            return new Winner(finalBoard, Marker.O, moveArray);
+        }
+
+        // Check for draw
+        if (IsDraw(finalBoard))
+        {
+            return new Draw(finalBoard, moveArray);
+        }
+
+        return new Game.InProgress(finalBoard, moveArray);
     }
 }

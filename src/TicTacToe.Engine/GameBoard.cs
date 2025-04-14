@@ -36,7 +36,7 @@ public record GameBoard : IEnumerable<Square>
     /// <summary>
     /// Gets a new board with the specified move applied.
     /// </summary>
-    public GameBoard WithMove(Move move)
+    public GameBoard WithMove(Move move, bool willEndGame = false)
     {
         if (!IsValidMove(this, move))
         {
@@ -45,6 +45,13 @@ public record GameBoard : IEnumerable<Square>
 
         // Get the next marker for available spaces after this move
         Marker nextMarker = move.Marker == Marker.X ? Marker.O : Marker.X;
+
+        // Verify that the move is for the expected next marker on this space
+        var currentSquare = _squares[move.Position];
+        if (currentSquare is Square.Available available && available.NextMarker != move.Marker)
+        {
+            throw new ArgumentException($"It's not {move.Marker}'s turn.", nameof(move));
+        }
 
         var spacesLength = this._squares.Length;
         var newSpaces = this._squares.ToBuilder();
@@ -57,7 +64,9 @@ public record GameBoard : IEnumerable<Square>
         {
             if (newSpaces[i] is Square.Available)
             {
-                newSpaces[i] = new Square.Available(nextMarker);
+                newSpaces[i] = willEndGame
+                    ? new Square.Unavailable()
+                    : new Square.Available(nextMarker);
             }
         }
 
@@ -67,12 +76,24 @@ public record GameBoard : IEnumerable<Square>
     /// <summary>
     /// Returns true if the specified position is available for a move.
     /// </summary>
-    private static bool IsValidMove(GameBoard board, Move move) =>
-        board._squares[move.Position] switch
+    internal static bool IsValidMove(GameBoard board, Move move)
+    {
+        // Position must be within board bounds (0-8)
+        if (move.Position < 0 || move.Position >= board._squares.Length)
         {
-            Square.Available sq when sq.NextMarker == move.Marker => true,
-            _ => false,
-        };
+            return false;
+        }
+
+        // The position must be available
+        var square = board._squares[move.Position];
+        if (square is not Square.Available availableSquare)
+        {
+            return false;
+        }
+
+        // The marker must match what's expected next
+        return availableSquare.NextMarker == move.Marker;
+    }
 
     /// <summary>
     /// Creates a game board from a sequence of moves.

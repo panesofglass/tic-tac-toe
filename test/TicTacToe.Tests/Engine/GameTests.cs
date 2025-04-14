@@ -1,5 +1,5 @@
 using TicTacToe.Engine;
-using System.Collections.Immutable;
+
 namespace TicTacToe.Tests.Engine;
 
 public class GameTests
@@ -697,58 +697,6 @@ public class GameTests
     }
 
     [Fact]
-    public void Given_SameBoard_When_CreatingGameDifferentWays_Then_ResultsAreEquivalent()
-    {
-        // Arrange - Create a sequence of moves
-        var moves = new[]
-        {
-            Move.Create(new Position(0), Marker.X),
-            Move.Create(new Position(4), Marker.O),
-            Move.Create(new Position(1), Marker.X),
-        };
-
-        // Act - Create games two different ways
-        var gameFromMoves = Game.FromMoves(moves);
-        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
-        var gameFromBoard = Game.FromBoard(board, moves.ToImmutableArray());
-
-        // Assert
-        Assert.IsType<Game.InProgress>(gameFromMoves);
-        Assert.IsType<Game.InProgress>(gameFromBoard);
-        
-        var inProgressFromMoves = (Game.InProgress)gameFromMoves;
-        var inProgressFromBoard = (Game.InProgress)gameFromBoard;
-
-        // Compare moves
-        Assert.Equal(inProgressFromMoves.Moves.Length, inProgressFromBoard.Moves.Length);
-        for (int i = 0; i < moves.Length; i++)
-        {
-            Assert.Equal(inProgressFromMoves.Moves[i].Position, inProgressFromBoard.Moves[i].Position);
-            Assert.Equal(inProgressFromMoves.Moves[i].Marker, inProgressFromBoard.Moves[i].Marker);
-        }
-
-        // Compare board states
-        for (byte i = 0; i < 9; i++)
-        {
-            var pos = new Position(i);
-            Assert.Equal(
-                inProgressFromMoves.Board[pos].GetType(),
-                inProgressFromBoard.Board[pos].GetType()
-            );
-            if (inProgressFromMoves.Board[pos] is Square.Taken taken1 &&
-                inProgressFromBoard.Board[pos] is Square.Taken taken2)
-            {
-                Assert.Equal(taken1.Marker, taken2.Marker);
-            }
-            else if (inProgressFromMoves.Board[pos] is Square.Available available1 &&
-                     inProgressFromBoard.Board[pos] is Square.Available available2)
-            {
-                Assert.Equal(available1.NextMarker, available2.NextMarker);
-            }
-        }
-    }
-
-    [Fact]
     public void Given_BoardWithWinner_When_CreatingGame_Then_TransitionsToWinnerState()
     {
         // Arrange - Create a winning board directly
@@ -760,10 +708,9 @@ public class GameTests
             Move.Create(new Position(4), Marker.O),
             Move.Create(new Position(2), Marker.X),
         };
-        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
 
         // Act
-        var game = Game.FromBoard(board, moves.ToImmutableArray());
+        var game = Game.FromMoves(moves);
 
         // Assert
         Assert.IsType<Game.Winner>(game);
@@ -783,8 +730,8 @@ public class GameTests
             Move.Create(new Position(1), Marker.X),
             Move.Create(new Position(4), Marker.O),
         };
-        var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
-        var game = Game.FromBoard(board, moves.ToImmutableArray());
+
+        var game = Game.FromMoves(moves);
 
         // Verify game is in progress
         Assert.IsType<Game.InProgress>(game);
@@ -815,7 +762,7 @@ public class GameTests
             Move.Create(new Position(6), Marker.O),
         };
         var board = moves.Aggregate(GameBoard.Empty, (b, m) => b.WithMove(m));
-        var game = Game.FromBoard(board, moves.ToImmutableArray());
+        var game = Game.FromMoves(moves);
 
         // Verify game is in progress
         Assert.IsType<Game.InProgress>(game);
@@ -904,5 +851,212 @@ public class GameTests
         // Act & Assert
         var exception = Assert.Throws<ArgumentException>(() => GameBoard.FromMoves(moves));
         Assert.Equal("Invalid move. (Parameter 'move')", exception.Message);
+    }
+
+    [Fact]
+    public void Given_CompletedGameWithWinner_Then_RemainingSquaresAreUnavailable()
+    {
+        // Arrange - X wins with top row (positions 0, 1, 2)
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(3), Marker.O),
+            Move.Create(new Position(1), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(2), Marker.X), // X wins with top row
+        };
+
+        // Act
+        var game = Game.FromMoves(moves);
+
+        // Assert
+        Assert.IsType<Game.Winner>(game);
+        var winnerGame = (Game.Winner)game;
+
+        // Positions 0, 1, 2, 3, 4 should be Taken
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(0)]);
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(1)]);
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(2)]);
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(3)]);
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(4)]);
+
+        // Positions 5, 6, 7, 8 should be Unavailable
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(5)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(6)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(7)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(8)]);
+    }
+
+    [Fact]
+    public void Given_CompletedGameWithDraw_Then_AllSquaresAreTaken()
+    {
+        // Arrange - Create a sequence of moves that results in a draw
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X), // X top-left
+            Move.Create(new Position(1), Marker.O), // O top-middle
+            Move.Create(new Position(2), Marker.X), // X top-right
+            Move.Create(new Position(4), Marker.O), // O middle-middle
+            Move.Create(new Position(3), Marker.X), // X middle-left
+            Move.Create(new Position(5), Marker.O), // O middle-right
+            Move.Create(new Position(7), Marker.X), // X bottom-middle
+            Move.Create(new Position(6), Marker.O), // O bottom-left
+            Move.Create(new Position(8), Marker.X), // X bottom-right (board is full)
+        };
+
+        // Act
+        var game = Game.FromMoves(moves);
+
+        // Assert
+        Assert.IsType<Game.Draw>(game);
+        var drawGame = (Game.Draw)game;
+
+        // In a draw, all squares should be Taken (not Unavailable)
+        for (byte i = 0; i < 9; i++)
+        {
+            Assert.IsType<Square.Taken>(drawGame.Board[new Position(i)]);
+        }
+    }
+
+    [Fact]
+    public void Given_GameTransitionsToWinner_Then_RemainingSquaresBecomeUnavailable()
+    {
+        // Arrange - Setup game one move away from X winning
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(3), Marker.O),
+            Move.Create(new Position(1), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+        };
+        var inProgressGame = Game.FromMoves(moves);
+        Assert.IsType<Game.InProgress>(inProgressGame);
+
+        // Verify squares 5-8 are Available before winning move
+        for (byte i = 5; i < 9; i++)
+        {
+            Assert.IsType<Square.Available>(
+                ((Game.InProgress)inProgressGame).Board[new Position(i)]
+            );
+        }
+
+        // Act - Make winning move
+        var afterWinningMove = inProgressGame.WithMove(Move.Create(new Position(2), Marker.X));
+
+        // Assert
+        Assert.IsType<Game.Winner>(afterWinningMove);
+        var winnerGame = (Game.Winner)afterWinningMove;
+
+        // Positions 0, 1, 2, 3, 4 should be Taken
+        for (byte i = 0; i <= 4; i++)
+        {
+            Assert.IsType<Square.Taken>(winnerGame.Board[new Position(i)]);
+        }
+
+        // Positions 5, 6, 7, 8 should be Unavailable
+        for (byte i = 5; i < 9; i++)
+        {
+            Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(i)]);
+        }
+    }
+
+    [Fact]
+    public void Given_InProgressGame_When_TransitioningToDraw_Then_NoSquaresAreUnavailable()
+    {
+        // Arrange - Setup a game one move away from draw
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X),
+            Move.Create(new Position(1), Marker.O),
+            Move.Create(new Position(2), Marker.X),
+            Move.Create(new Position(4), Marker.O),
+            Move.Create(new Position(3), Marker.X),
+            Move.Create(new Position(5), Marker.O),
+            Move.Create(new Position(7), Marker.X),
+            Move.Create(new Position(6), Marker.O),
+        };
+        var inProgressGame = Game.FromMoves(moves);
+        Assert.IsType<Game.InProgress>(inProgressGame);
+
+        // Act - Make final move leading to draw
+        var afterFinalMove = inProgressGame.WithMove(Move.Create(new Position(8), Marker.X));
+
+        // Assert - Should be a draw with all positions Taken (not Unavailable)
+        Assert.IsType<Game.Draw>(afterFinalMove);
+        var drawGame = (Game.Draw)afterFinalMove;
+
+        // All squares should be Taken
+        for (byte i = 0; i < 9; i++)
+        {
+            Assert.IsType<Square.Taken>(drawGame.Board[new Position(i)]);
+        }
+    }
+
+    [Fact]
+    public void Given_Winner_When_LoadingFromExactMoves_Then_RemainingSquaresAreUnavailable()
+    {
+        // Arrange - X wins with left column (positions 0, 3, 6)
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X), // X top-left
+            Move.Create(new Position(1), Marker.O), // O top-middle
+            Move.Create(new Position(3), Marker.X), // X middle-left
+            Move.Create(new Position(2), Marker.O), // O top-right
+            Move.Create(new Position(6), Marker.X), // X bottom-left (winning move)
+        };
+
+        // Act
+        var game = Game.FromMoves(moves);
+
+        // Assert
+        Assert.IsType<Game.Winner>(game);
+        var winnerGame = (Game.Winner)game;
+
+        // Positions 0, 1, 2, 3, 6 should be Taken
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(0)]); // X
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(1)]); // O
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(2)]); // O
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(3)]); // X
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(6)]); // X
+
+        // Positions 4, 5, 7, 8 should be Unavailable (not Taken or Available)
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(4)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(5)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(7)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(8)]);
+    }
+
+    [Fact]
+    public void Given_WinnerGame_When_CreatingFromBoard_Then_RemainingSquaresAreUnavailable()
+    {
+        // Arrange - Create a board with X winning the diagonal (0, 4, 8)
+        var moves = new[]
+        {
+            Move.Create(new Position(0), Marker.X), // X top-left
+            Move.Create(new Position(1), Marker.O), // O top-middle
+            Move.Create(new Position(4), Marker.X), // X middle-middle
+            Move.Create(new Position(2), Marker.O), // O top-right
+            Move.Create(new Position(8), Marker.X), // X bottom-right (winning move)
+        };
+
+        // Act
+        var game = Game.FromMoves(moves);
+
+        // Assert
+        Assert.IsType<Game.Winner>(game);
+        var winnerGame = (Game.Winner)game;
+
+        // Positions 0, 1, 2, 4, 8 should be Taken
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(0)]); // X
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(1)]); // O
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(2)]); // O
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(4)]); // X
+        Assert.IsType<Square.Taken>(winnerGame.Board[new Position(8)]); // X
+
+        // Positions 3, 5, 6, 7 should be Unavailable
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(3)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(5)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(6)]);
+        Assert.IsType<Square.Unavailable>(winnerGame.Board[new Position(7)]);
     }
 }

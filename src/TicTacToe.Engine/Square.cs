@@ -18,5 +18,10 @@ namespace TicTacToe.Engine
         /// </summary>
         /// <param name="NextMarker">The marker that would be placed if this square is chosen.</param>
         public sealed record Available(Marker NextMarker) : Square;
+
+        /// <summary>
+        /// Represents a square that is no longer available because the game has ended.
+        /// </summary>
+        public sealed record Unavailable : Square;
     }
 }

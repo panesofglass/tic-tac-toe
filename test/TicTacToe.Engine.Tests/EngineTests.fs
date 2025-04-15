@@ -1,4 +1,4 @@
-module Tests
+module TicTacToe.Engine.Tests.EngineTests
 
 open Expecto
 open TicTacToe.Engine
@@ -89,9 +89,9 @@ let gameInitializationTests =
 
             // Check that all positions are available
             let positions = validMoves |> Array.map (fun (XPos pos) -> pos) |> Set.ofArray
-            let expectedPositions = 
-                [TopLeft; TopCenter; TopRight; 
-                 MiddleLeft; MiddleCenter; MiddleRight; 
+            let expectedPositions =
+                [TopLeft; TopCenter; TopRight;
+                 MiddleLeft; MiddleCenter; MiddleRight;
                  BottomLeft; BottomCenter; BottomRight] |> Set.ofList
 
             Expect.equal positions expectedPositions "All board positions should be valid moves"
@@ -298,6 +298,67 @@ let invalidMoveTests =
             let gameState = getGameState result
             expectTakenByX gameState TopLeft
             expectEmptySquare gameState TopRight
+
+        testCase "Attempting to move after X wins is invalid" <| fun _ ->
+            let moves = [
+                XMove TopLeft     // X wins with top row
+                OMove MiddleLeft
+                XMove TopCenter
+                OMove MiddleCenter
+                XMove TopRight
+            ]
+            let wonState = applyMoves (startGame()) moves
+
+            // Try to make moves after game is won
+            let resultAfterO = makeMove (wonState, OMove BottomLeft)
+            let resultAfterX = makeMove (wonState, XMove BottomRight)
+
+            // Game state should not change
+            Expect.isTrue (isWon resultAfterO X) "Should remain in won state after O's move"
+            Expect.isTrue (isWon resultAfterX X) "Should remain in won state after X's move"
+
+            let gameState = getGameState resultAfterX
+            expectTakenByX gameState TopLeft
+            expectTakenByX gameState TopCenter
+            expectTakenByX gameState TopRight
+            expectTakenByO gameState MiddleLeft
+            expectTakenByO gameState MiddleCenter
+            expectEmptySquare gameState BottomLeft
+            expectEmptySquare gameState BottomRight
+
+        testCase "Attempting to move after draw is invalid" <| fun _ ->
+            let moves = [
+                XMove TopLeft      // X | O | X
+                OMove TopCenter    // X | O | O
+                XMove MiddleLeft   // O | X | O
+                OMove MiddleRight
+                XMove TopRight
+                OMove BottomLeft
+                XMove BottomCenter
+                OMove BottomRight
+                XMove MiddleCenter // Draw - no winner
+            ]
+            let drawState = applyMoves (startGame()) moves
+
+            // Try to make moves after draw
+            let resultAfterX = makeMove (drawState, XMove TopLeft)  // Try to override existing move
+            let resultAfterO = makeMove (drawState, OMove TopRight) // Try to override existing move
+
+            // Game state should not change
+            Expect.isTrue (isDraw resultAfterX) "Should remain in draw state after X's move"
+            Expect.isTrue (isDraw resultAfterO) "Should remain in draw state after O's move"
+
+            // Verify board remains unchanged
+            let gameState = getGameState resultAfterO
+            expectTakenByX gameState TopLeft
+            expectTakenByO gameState TopCenter
+            expectTakenByX gameState TopRight
+            expectTakenByX gameState MiddleLeft
+            expectTakenByX gameState MiddleCenter
+            expectTakenByO gameState MiddleRight
+            expectTakenByO gameState BottomLeft
+            expectTakenByX gameState BottomCenter
+            expectTakenByO gameState BottomRight
     ]
 
 [<Tests>]

@@ -1,4 +1,5 @@
-﻿module TicTacToe.Engine.Tests
+﻿module TicTacToe.Engine.Tests.Main
+
 open Expecto
 
 [<EntryPoint>]

@@ -45,22 +45,16 @@ type MoveResult =
     | Won of GameState * Player
     | Draw of GameState
 
-type StartGame = unit -> MoveResult
-
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
 type Move =
     | XMove of SquarePosition
     | OMove of SquarePosition
 
-type XMove =
-    MoveResult * XPosition -> MoveResult
-
-type OMove =
-    MoveResult * OPosition -> MoveResult
+type StartGame = unit -> MoveResult
 
 type MakeMove = MoveResult * Move -> MoveResult
 
 val startGame : StartGame
 
-val move : MakeMove
+val makeMove : MakeMove

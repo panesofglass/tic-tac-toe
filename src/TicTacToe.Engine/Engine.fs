@@ -45,8 +45,6 @@ type MoveResult =
     | Won of GameState * Player
     | Draw of GameState
 
-type StartGame = unit -> MoveResult
-
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
 type Move =
@@ -56,6 +54,8 @@ type Move =
 type XMove = MoveResult * XPosition -> MoveResult
 
 type OMove = MoveResult * OPosition -> MoveResult
+
+type StartGame = unit -> MoveResult
 
 type MakeMove = MoveResult * Move -> MoveResult
 
@@ -167,7 +167,7 @@ let moveO: OMove = fun (moveResult, OPos oPosition) ->
         | _ -> moveResult
     | _ -> moveResult
 
-let move: MakeMove = fun (moveResult, move) ->
+let makeMove: MakeMove = fun (moveResult, move) ->
     match moveResult, move with
     | XTurn _, XMove pos ->
         moveX (moveResult, XPos pos)

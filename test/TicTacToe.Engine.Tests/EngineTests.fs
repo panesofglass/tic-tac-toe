@@ -6,7 +6,7 @@ open System.Collections.Generic
 
 // Helper functions for testing
 let applyMoves (initialState: MoveResult) (moves: Move list) =
-    moves |> List.fold (fun state moveAction -> move (state, moveAction)) initialState
+    moves |> List.fold (fun state moveAction -> makeMove (state, moveAction)) initialState
 
 let isXTurn (result: MoveResult) =
     match result with
@@ -102,7 +102,7 @@ let moveMechanicsTests =
     testList "Move Mechanics Tests" [
         testCase "Making a valid X move results in O's turn" <| fun _ ->
             let initialState = startGame ()
-            let result = move (initialState, XMove TopLeft)
+            let result = makeMove (initialState, XMove TopLeft)
 
             Expect.isTrue (isOTurn result) "After X moves, it should be O's turn"
 
@@ -111,8 +111,8 @@ let moveMechanicsTests =
 
         testCase "Making a valid O move results in X's turn" <| fun _ ->
             let initialState = startGame ()
-            let afterXMove = move (initialState, XMove TopLeft)
-            let result = move (afterXMove, OMove TopRight)
+            let afterXMove = makeMove (initialState, XMove TopLeft)
+            let result = makeMove (afterXMove, OMove TopRight)
 
             Expect.isTrue (isXTurn result) "After O moves, it should be X's turn"
 
@@ -122,7 +122,7 @@ let moveMechanicsTests =
 
         testCase "Valid moves array is updated after each move" <| fun _ ->
             let initialState = startGame ()
-            let afterXMove = move (initialState, XMove TopLeft)
+            let afterXMove = makeMove (initialState, XMove TopLeft)
 
             // Check O's valid moves
             let validOMoves = getValidOMoves afterXMove
@@ -133,7 +133,7 @@ let moveMechanicsTests =
             Expect.isFalse (oPositions.Contains TopLeft) "TopLeft should no longer be a valid move"
 
             // Make O move
-            let afterOMove = move (afterXMove, OMove TopRight)
+            let afterOMove = makeMove (afterXMove, OMove TopRight)
 
             // Check X's valid moves
             let validXMoves = getValidXMoves afterOMove
@@ -262,10 +262,10 @@ let invalidMoveTests =
     testList "Invalid Move Tests" [
         testCase "Attempting to move in an already taken square is invalid" <| fun _ ->
             let initialState = startGame ()
-            let afterXMove = move (initialState, XMove TopLeft)
+            let afterXMove = makeMove (initialState, XMove TopLeft)
 
             // O tries to move in the same square
-            let result = move (afterXMove, OMove TopLeft)
+            let result = makeMove (afterXMove, OMove TopLeft)
 
             // Game state should not change
             Expect.isTrue (isOTurn result) "Should still be O's turn after invalid move"
@@ -277,7 +277,7 @@ let invalidMoveTests =
             let initialState = startGame ()
 
             // O tries to move on X's turn
-            let result = move (initialState, OMove TopLeft)
+            let result = makeMove (initialState, OMove TopLeft)
 
             // Game state should not change
             Expect.isTrue (isXTurn result) "Should still be X's turn after invalid move"
@@ -287,10 +287,10 @@ let invalidMoveTests =
 
         testCase "Attempting to make X move during O's turn is invalid" <| fun _ ->
             let initialState = startGame ()
-            let afterXMove = move (initialState, XMove TopLeft)
+            let afterXMove = makeMove (initialState, XMove TopLeft)
 
             // X tries to move again on O's turn
-            let result = move (afterXMove, XMove TopRight)
+            let result = makeMove (afterXMove, XMove TopRight)
 
             // Game state should not change
             Expect.isTrue (isOTurn result) "Should still be O's turn after invalid move"

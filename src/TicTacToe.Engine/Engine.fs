@@ -77,33 +77,50 @@ let startGame: StartGame = fun () ->
     XTurn (gameState, validMovesForX)
 
 let winningCombinations =
-    [| [| TopLeft; TopCenter; TopRight |]
-       [| MiddleLeft; MiddleCenter; MiddleRight |]
-       [| BottomLeft; BottomCenter; BottomRight |]
-       [| TopLeft; MiddleLeft; BottomLeft |]
-       [| TopCenter; MiddleCenter; BottomCenter |]
-       [| TopRight; MiddleRight; BottomRight |]
-       [| TopLeft; MiddleCenter; BottomRight |]
-       [| TopRight; MiddleCenter; BottomLeft |] |]
+    [ [ TopLeft; TopCenter; TopRight ]
+      [ MiddleLeft; MiddleCenter; MiddleRight ]
+      [ BottomLeft; BottomCenter; BottomRight ]
+      [ TopLeft; MiddleLeft; BottomLeft ]
+      [ TopCenter; MiddleCenter; BottomCenter ]
+      [ TopRight; MiddleRight; BottomRight ]
+      [ TopLeft; MiddleCenter; BottomRight ]
+      [ TopRight; MiddleCenter; BottomLeft ] ]
 
-let tryFindWinningPlayer (gameState: GameState) (combination: SquarePosition[]) =
-    let allSquares =
-        combination
-        |> Array.choose (fun pos -> 
-            match gameState.TryGetValue(pos) with
-            | true, Taken player -> Some player
-            | _ -> None)
+let rec tryFindWinningPlayer gameState =
+    tryFindWinningPlayerIter (ValueNone, winningCombinations) gameState
 
-    if allSquares.Length = combination.Length && 
-        Array.forall (fun p -> p = allSquares[0]) allSquares then
-        Some allSquares[0]
-    else
-        None
+and tryFindWinningPlayerIter acc gameState =
+    match acc with
+    | ValueSome player, _ -> ValueSome player
+    | ValueNone, [] -> ValueNone
+    | ValueNone, combination::remainingCombinations ->
+        match testCombination combination gameState with
+        | ValueSome player -> ValueSome player
+        | ValueNone -> tryFindWinningPlayerIter (ValueNone, remainingCombinations) gameState
+
+and testCombination squares (gameState: GameState) =
+    match squares with
+    | [] -> ValueNone
+    | square::remaining ->
+        match gameState.TryGetValue(square) with
+        | true, Taken player -> testNextSquare (player, remaining) gameState
+        | _ -> ValueNone
+
+and testNextSquare (player, squares) (gameState: GameState) =
+    match squares with
+    | [] -> ValueNone
+    | square::remaining ->
+        match gameState.TryGetValue(square) with
+        | true, Taken p when p = player ->
+            match remaining with
+            | [] -> ValueSome player
+            | _ -> testNextSquare (player, remaining) gameState
+        | _ -> ValueNone
 
 let (|HasWinner|IsDraw|InProgress|) (gameState: GameState) =
-    match winningCombinations |> Array.tryPick (tryFindWinningPlayer gameState) with
-    | Some player -> HasWinner player
-    | None -> 
+    match tryFindWinningPlayer gameState with
+    | ValueSome player -> HasWinner player
+    | ValueNone -> 
         // First check if all squares are taken
         let noEmptySquares = gameState.Values |> Seq.forall (fun state -> state <> Empty)
         if noEmptySquares then IsDraw
@@ -151,7 +168,7 @@ let moveO: OMove = fun (moveResult, OPos oPosition) ->
             // Then check for a draw
             | IsDraw -> 
                 Draw(gameState')
-            | _ ->
+            | InProgress ->
                 let validMovesForX: ValidMovesForX =
                     [| for KeyValue(pos, state) in gameState' do
                         if state = Empty then yield XPos pos |]

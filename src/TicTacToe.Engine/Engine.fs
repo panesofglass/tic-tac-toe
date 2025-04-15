@@ -37,13 +37,15 @@ type ValidMovesForX = XPosition[]
 
 type ValidMovesForO = OPosition[]
 
-type MoveResult<'GameState> =
-    | XTurn of 'GameState * ValidMovesForX
-    | OTurn of 'GameState * ValidMovesForO
-    | Won of 'GameState * Player
-    | Draw of 'GameState
+type GameState = IReadOnlyDictionary<SquarePosition, SquareState>
 
-type StartGame<'GameState> = unit -> MoveResult<'GameState>
+type MoveResult =
+    | XTurn of GameState * ValidMovesForX
+    | OTurn of GameState * ValidMovesForO
+    | Won of GameState * Player
+    | Draw of GameState
+
+type StartGame = unit -> MoveResult
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -51,17 +53,13 @@ type Move =
     | XMove of SquarePosition
     | OMove of SquarePosition
 
-type XMove<'GameState> =
-    MoveResult<'GameState> * XPosition -> MoveResult<'GameState>
+type XMove = MoveResult * XPosition -> MoveResult
 
-type OMove<'GameState> =
-    MoveResult<'GameState> * OPosition -> MoveResult<'GameState>
+type OMove = MoveResult * OPosition -> MoveResult
 
-type MakeMove<'GameState> = MoveResult<'GameState> * Move -> MoveResult<'GameState>
+type MakeMove = MoveResult * Move -> MoveResult
 
-type GameState = IReadOnlyDictionary<SquarePosition, SquareState>
-
-let startGame: StartGame<GameState> = fun () ->
+let startGame: StartGame = fun () ->
     let gameState =
         [| TopLeft, Empty
            TopCenter, Empty
@@ -107,12 +105,19 @@ let (|HasWinner|_|) (gameState: GameState) =
     |> Array.tryPick getWinningPlayer
 
 let (|IsDraw|_|) (gameState: GameState) =
-    if gameState.Values |> Seq.forall (fun state -> state <> Empty) then
-        Some()
+    // First check if all squares are taken
+    let noEmptySquares = gameState.Values |> Seq.forall (fun state -> state <> Empty)
+    
+    // Then ensure there's no winner
+    if noEmptySquares then
+        // Check specifically for winners
+        match gameState with
+        | HasWinner _ -> None  // If there's a winner, it's not a draw
+        | _ -> Some()          // Full board with no winner = draw
     else
-        None
+        None                    // Board not full, not a draw
 
-let moveX: XMove<GameState> = fun (moveResult, XPos xPosition) ->
+let moveX: XMove = fun (moveResult, XPos xPosition) ->
     match moveResult with
     | XTurn (gameState, _) ->
         match gameState.TryGetValue(xPosition) with
@@ -122,20 +127,24 @@ let moveX: XMove<GameState> = fun (moveResult, XPos xPosition) ->
                     pos, if pos = xPosition then Taken X else state |]
                 |> readOnlyDict
 
+            // First check for a winner
             match gameState' with
-            | HasWinner player -> Won(gameState', player)
-            | IsDraw -> Draw(gameState')
+            | HasWinner player -> 
+                Won(gameState', player)
+            // Then check for a draw
+            | IsDraw -> 
+                Draw(gameState')
             | _ ->
                 let validMovesForO: ValidMovesForO =
-                    [| for KeyValue(pos, state) in gameState do
+                    [| for KeyValue(pos, state) in gameState' do
                         if state = Empty then yield OPos pos |]
                 OTurn(gameState', validMovesForO)
         | _ -> moveResult
     | _ -> moveResult
 
-let moveO: OMove<GameState> = fun (moveResult, OPos oPosition) ->
+let moveO: OMove = fun (moveResult, OPos oPosition) ->
     match moveResult with
-    | XTurn (gameState, _) ->
+    | OTurn (gameState, _) ->
         match gameState.TryGetValue(oPosition) with
         | true, Empty ->
             let gameState' =
@@ -143,18 +152,22 @@ let moveO: OMove<GameState> = fun (moveResult, OPos oPosition) ->
                     pos, if pos = oPosition then Taken O else state |]
                 |> readOnlyDict
 
+            // First check for a winner
             match gameState' with
-            | HasWinner player -> Won(gameState', player)
-            | IsDraw -> Draw(gameState')
+            | HasWinner player -> 
+                Won(gameState', player)
+            // Then check for a draw
+            | IsDraw -> 
+                Draw(gameState')
             | _ ->
                 let validMovesForX: ValidMovesForX =
-                    [| for KeyValue(pos, state) in gameState do
+                    [| for KeyValue(pos, state) in gameState' do
                         if state = Empty then yield XPos pos |]
                 XTurn(gameState', validMovesForX)
         | _ -> moveResult
     | _ -> moveResult
 
-let move (moveResult, move) =
+let move: MakeMove = fun (moveResult, move) ->
     match moveResult, move with
     | XTurn _, XMove pos ->
         moveX (moveResult, XPos pos)

@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Engine.fsi" />
     <Compile Include="Engine.fs" />
   </ItemGroup>
 

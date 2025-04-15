@@ -37,13 +37,15 @@ type ValidMovesForX = XPosition[]
 
 type ValidMovesForO = OPosition[]
 
-type MoveResult<'GameState> =
-    | XTurn of 'GameState * ValidMovesForX
-    | OTurn of 'GameState * ValidMovesForO
-    | Won of 'GameState * Player
-    | Draw of 'GameState
+type GameState = IReadOnlyDictionary<SquarePosition, SquareState>
 
-type StartGame<'GameState> = unit -> MoveResult<'GameState>
+type MoveResult =
+    | XTurn of GameState * ValidMovesForX
+    | OTurn of GameState * ValidMovesForO
+    | Won of GameState * Player
+    | Draw of GameState
+
+type StartGame = unit -> MoveResult
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -51,14 +53,14 @@ type Move =
     | XMove of SquarePosition
     | OMove of SquarePosition
 
-type XMove<'GameState> =
-    MoveResult<'GameState> * XPosition -> MoveResult<'GameState>
+type XMove =
+    MoveResult * XPosition -> MoveResult
 
-type OMove<'GameState> =
-    MoveResult<'GameState> * OPosition -> MoveResult<'GameState>
+type OMove =
+    MoveResult * OPosition -> MoveResult
 
-type MakeMove<'GameState> = MoveResult<'GameState> * Move -> MoveResult<'GameState>
+type MakeMove = MoveResult * Move -> MoveResult
 
-val startGame : StartGame<'GameState>
+val startGame : StartGame
 
-val makeMove : MakeMove<'GameState>
+val move : MakeMove

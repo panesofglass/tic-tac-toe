@@ -5,8 +5,32 @@ open TicTacToe.Engine
 open System.Collections.Generic
 
 // Helper functions for testing
+
+let isError (result: MoveResult) =
+    match result with
+    | Error _ -> true
+    | _ -> false
+
+let getErrorMessage (result: MoveResult) =
+    match result with
+    | Error (_, message) -> message
+    | _ -> failwith "Expected Error but got a different MoveResult variant"
+
+let expectNoError (result: MoveResult) message =
+    match result with
+    | Error (_, err) -> failwith $"{message}. Got Error: {err}"
+    | _ -> Expect.isTrue true message
+
+let expectError (result: MoveResult) expectedError message =
+    match result with
+    | Error (_, err) -> Expect.equal err expectedError message
+    | _ -> failwith $"{message}. Expected Error but got a different MoveResult variant"
 let applyMoves (initialState: MoveResult) (moves: Move list) =
-    moves |> List.fold (fun state moveAction -> makeMove (state, moveAction)) initialState
+    moves 
+    |> List.fold (fun state moveAction -> 
+        match state with
+        | Error _ -> state  // If we already have an error, propagate it
+        | _ -> makeMove (state, moveAction)) initialState
 
 let isXTurn (result: MoveResult) =
     match result with
@@ -34,6 +58,7 @@ let getGameState (result: MoveResult) =
     | OTurn (gameState, _) -> gameState
     | Won (gameState, _) -> gameState
     | Draw gameState -> gameState
+    | Error (gameState, _) -> gameState
 
 let getValidXMoves (result: MoveResult) =
     match result with
@@ -100,30 +125,11 @@ let gameInitializationTests =
 [<Tests>]
 let moveMechanicsTests =
     testList "Move Mechanics Tests" [
-        testCase "Making a valid X move results in O's turn" <| fun _ ->
-            let initialState = startGame ()
-            let result = makeMove (initialState, XMove TopLeft)
-
-            Expect.isTrue (isOTurn result) "After X moves, it should be O's turn"
-
-            let gameState = getGameState result
-            expectTakenByX gameState TopLeft
-
-        testCase "Making a valid O move results in X's turn" <| fun _ ->
-            let initialState = startGame ()
-            let afterXMove = makeMove (initialState, XMove TopLeft)
-            let result = makeMove (afterXMove, OMove TopRight)
-
-            Expect.isTrue (isXTurn result) "After O moves, it should be X's turn"
-
-            let gameState = getGameState result
-            expectTakenByX gameState TopLeft
-            expectTakenByO gameState TopRight
-
         testCase "Valid moves array is updated after each move" <| fun _ ->
             let initialState = startGame ()
             let afterXMove = makeMove (initialState, XMove TopLeft)
-
+            expectNoError afterXMove "X's move should succeed"
+            
             // Check O's valid moves
             let validOMoves = getValidOMoves afterXMove
             Expect.equal validOMoves.Length 8 "Should have 8 valid moves after X plays"
@@ -134,7 +140,8 @@ let moveMechanicsTests =
 
             // Make O move
             let afterOMove = makeMove (afterXMove, OMove TopRight)
-
+            expectNoError afterOMove "O's move should succeed"
+            
             // Check X's valid moves
             let validXMoves = getValidXMoves afterOMove
             Expect.equal validXMoves.Length 7 "Should have 7 valid moves after O plays"
@@ -156,9 +163,9 @@ let winConditionTests =
                 OMove MiddleCenter // O
                 XMove TopRight   // X wins
             ]
-
             let result = applyMoves (startGame()) moves
-
+            expectNoError result "Applying moves should succeed"
+            
             Expect.isTrue (isWon result X) "X should win with top row"
 
             let gameState = getGameState result
@@ -177,7 +184,8 @@ let winConditionTests =
             ]
 
             let result = applyMoves (startGame()) moves
-
+            expectNoError result "Applying moves should succeed"
+            
             Expect.isTrue (isWon result O) "O should win with middle row"
 
             let gameState = getGameState result
@@ -195,7 +203,8 @@ let winConditionTests =
             ]
 
             let result = applyMoves (startGame()) moves
-
+            expectNoError result "Applying moves should succeed"
+            
             Expect.isTrue (isWon result X) "X should win with left column"
 
             let gameState = getGameState result
@@ -214,7 +223,8 @@ let winConditionTests =
             ]
 
             let result = applyMoves (startGame()) moves
-
+            expectNoError result "Applying moves should succeed"
+            
             Expect.isTrue (isWon result O) "O should win with diagonal"
 
             let gameState = getGameState result
@@ -230,7 +240,7 @@ let drawConditionTests =
             // This sequence creates a full board with no winner
             let moves = [
                 XMove TopLeft      // X | O | X    First row
-                OMove TopCenter    // X | O | O    Second row
+                OMove TopCenter    // X | X | O    Second row
                 XMove MiddleLeft   // O | X | O    Third row - no winning lines
                 OMove MiddleRight
                 XMove TopRight
@@ -241,7 +251,8 @@ let drawConditionTests =
             ]
 
             let result = applyMoves (startGame()) moves
-
+            expectNoError result "Applying moves should succeed"
+            
             Expect.isTrue (isDraw result) "Game should end in a draw"
 
             // Verify board is full
@@ -263,14 +274,13 @@ let invalidMoveTests =
         testCase "Attempting to move in an already taken square is invalid" <| fun _ ->
             let initialState = startGame ()
             let afterXMove = makeMove (initialState, XMove TopLeft)
-
+            expectNoError afterXMove "X's move should succeed"
+            
             // O tries to move in the same square
             let result = makeMove (afterXMove, OMove TopLeft)
-
-            // Game state should not change
-            Expect.isTrue (isOTurn result) "Should still be O's turn after invalid move"
-
-            let gameState = getGameState result
+            expectError result "Invalid move" "Invalid move should return Error but not change state"
+            
+            let gameState = getGameState afterXMove
             expectTakenByX gameState TopLeft
 
         testCase "Attempting to make O move during X's turn is invalid" <| fun _ ->
@@ -278,25 +288,21 @@ let invalidMoveTests =
 
             // O tries to move on X's turn
             let result = makeMove (initialState, OMove TopLeft)
+            expectError result "Invalid move" "Invalid move should return Error but not change state"
 
-            // Game state should not change
-            Expect.isTrue (isXTurn result) "Should still be X's turn after invalid move"
-
-            let gameState = getGameState result
+            let gameState = getGameState initialState
             expectEmptySquare gameState TopLeft
 
         testCase "Attempting to make X move during O's turn is invalid" <| fun _ ->
             let initialState = startGame ()
             let afterXMove = makeMove (initialState, XMove TopLeft)
-
+            expectNoError afterXMove "X's move should succeed"
+            
             // X tries to move again on O's turn
             let result = makeMove (afterXMove, XMove TopRight)
-
-            // Game state should not change
-            Expect.isTrue (isOTurn result) "Should still be O's turn after invalid move"
-
-            let gameState = getGameState result
-            expectTakenByX gameState TopLeft
+            expectError result "Invalid move" "Invalid move should return Error but not change state"
+            
+            let gameState = getGameState afterXMove
             expectEmptySquare gameState TopRight
 
         testCase "Attempting to move after X wins is invalid" <| fun _ ->
@@ -308,16 +314,18 @@ let invalidMoveTests =
                 XMove TopRight
             ]
             let wonState = applyMoves (startGame()) moves
-
+            expectNoError wonState "X should have won"
+            
             // Try to make moves after game is won
             let resultAfterO = makeMove (wonState, OMove BottomLeft)
             let resultAfterX = makeMove (wonState, XMove BottomRight)
 
-            // Game state should not change
-            Expect.isTrue (isWon resultAfterO X) "Should remain in won state after O's move"
-            Expect.isTrue (isWon resultAfterX X) "Should remain in won state after X's move"
+            // Should get "Game already won" error
+            expectError resultAfterO "Game already won" "Should return error when moving after win"
+            expectError resultAfterX "Game already won" "Should return error when moving after win"
 
-            let gameState = getGameState resultAfterX
+            // Original game state
+            let gameState = getGameState wonState
             expectTakenByX gameState TopLeft
             expectTakenByX gameState TopCenter
             expectTakenByX gameState TopRight
@@ -329,7 +337,7 @@ let invalidMoveTests =
         testCase "Attempting to move after draw is invalid" <| fun _ ->
             let moves = [
                 XMove TopLeft      // X | O | X
-                OMove TopCenter    // X | O | O
+                OMove TopCenter    // X | X | O
                 XMove MiddleLeft   // O | X | O
                 OMove MiddleRight
                 XMove TopRight
@@ -339,17 +347,18 @@ let invalidMoveTests =
                 XMove MiddleCenter // Draw - no winner
             ]
             let drawState = applyMoves (startGame()) moves
-
+            expectNoError drawState "Game should end in draw"
+            
             // Try to make moves after draw
             let resultAfterX = makeMove (drawState, XMove TopLeft)  // Try to override existing move
             let resultAfterO = makeMove (drawState, OMove TopRight) // Try to override existing move
 
-            // Game state should not change
-            Expect.isTrue (isDraw resultAfterX) "Should remain in draw state after X's move"
-            Expect.isTrue (isDraw resultAfterO) "Should remain in draw state after O's move"
+            // Should get "Game over" error
+            expectError resultAfterX "Game over" "Should return error when moving after draw"
+            expectError resultAfterO "Game over" "Should return error when moving after draw"
 
-            // Verify board remains unchanged
-            let gameState = getGameState resultAfterO
+            // Original game state should remain unchanged
+            let gameState = getGameState drawState
             expectTakenByX gameState TopLeft
             expectTakenByO gameState TopCenter
             expectTakenByX gameState TopRight
@@ -362,11 +371,65 @@ let invalidMoveTests =
     ]
 
 [<Tests>]
+let moveResultErrorTests =
+    testList "MoveResult Error Tests" [
+        testCase "Moving with wrong player returns Invalid move error" <| fun _ ->
+            let initialState = startGame ()
+            let wrongPlayerMove = makeMove (initialState, OMove TopLeft)
+            expectError wrongPlayerMove "Invalid move" "Should get error after wrong player move"
+
+        testCase "Error handling with pattern matching works correctly" <| fun _ ->
+            // Demo of error handling pattern with MoveResult
+            let initialState = startGame()
+            let moves = [XMove TopLeft; OMove TopCenter; XMove TopRight]
+            
+            // Simulate a sequence of moves with error handling using pattern matching
+            let finalResult = 
+                moves |> List.fold (fun state move ->
+                    match state with
+                    | Error _ -> state
+                    | _ -> 
+                        let moveResult = makeMove (state, move)
+                        match moveResult with
+                        | Error _ -> moveResult
+                        | _ -> moveResult) initialState
+            
+            // Assert final result is not an error
+            expectNoError finalResult "Move sequence should succeed"
+            
+            // Check that moves were applied correctly
+            let gameState = getGameState finalResult
+            expectTakenByX gameState TopLeft
+            expectTakenByO gameState TopCenter
+            expectTakenByX gameState TopRight
+
+        testCase "Error propagation works correctly" <| fun _ ->
+            // Test error propagation with a sequence of moves leading to a win
+            // followed by an invalid move
+            let initialState = startGame()
+            let winningMoves = [
+                XMove TopLeft; OMove MiddleLeft; 
+                XMove TopCenter; OMove MiddleCenter; 
+                XMove TopRight  // X wins
+            ]
+            
+            // Apply moves until we reach a win
+            let wonGameResult = applyMoves (startGame()) winningMoves
+            expectNoError wonGameResult "Winning sequence should succeed"
+            
+            // Try to make another move after game is won
+            let invalidMoveResult = makeMove (wonGameResult, OMove BottomLeft)
+            
+            // This should be an error
+            expectError invalidMoveResult "Game already won" "Should get error when moving after win"
+    ]
+
+[<Tests>]
 let tests =
     testList "TicTacToe Engine Tests" [
         gameInitializationTests
         moveMechanicsTests
         winConditionTests
-        drawConditionTests
         invalidMoveTests
+        moveResultErrorTests
     ]

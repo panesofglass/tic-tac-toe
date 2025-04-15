@@ -44,6 +44,7 @@ type MoveResult =
     | OTurn of GameState * ValidMovesForO
     | Won of GameState * Player
     | Draw of GameState
+    | Error of GameState * string
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -136,7 +137,10 @@ let moveX: XMove = fun (moveResult, XPos xPosition) ->
                     [| for KeyValue(pos, state) in gameState' do
                         if state = Empty then yield OPos pos |]
                 OTurn(gameState', validMovesForO)
-        | _ -> moveResult
+        | _ -> Error(gameState, "Invalid move")
+    | OTurn(gameState, _) -> Error(gameState, "Invalid move")
+    | Won(gameState, _) -> Error(gameState, "Game already won")
+    | Draw gameState -> Error(gameState, "Game over")
     | _ -> moveResult
 
 let moveO: OMove = fun (moveResult, OPos oPosition) ->
@@ -161,13 +165,20 @@ let moveO: OMove = fun (moveResult, OPos oPosition) ->
                     [| for KeyValue(pos, state) in gameState' do
                         if state = Empty then yield XPos pos |]
                 XTurn(gameState', validMovesForX)
-        | _ -> moveResult
+        | _ -> Error(gameState, "Invalid move")
+    | XTurn(gameState, _) -> Error(gameState, "Invalid move")
+    | Won(gameState, _) -> Error(gameState, "Game already won")
+    | Draw gameState -> Error(gameState, "Game over")
     | _ -> moveResult
 
 let makeMove: MakeMove = fun (moveResult, move) ->
     match moveResult, move with
     | XTurn _, XMove pos ->
         moveX (moveResult, XPos pos)
+    | XTurn(gameState, _), _ -> Error(gameState, "Invalid move")
     | OTurn _, OMove pos ->
         moveO (moveResult, OPos pos)
+    | OTurn(gameState, _), _ -> Error(gameState, "Invalid move")
+    | Won(gameState, _), _ -> Error(gameState, "Game already won")
+    | Draw gameState, _ -> Error(gameState, "Game over")
     | _ -> moveResult

@@ -44,6 +44,7 @@ type MoveResult =
     | OTurn of GameState * ValidMovesForO
     | Won of GameState * Player
     | Draw of GameState
+    | Error of GameState * string
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]

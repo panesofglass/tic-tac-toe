@@ -59,9 +59,7 @@ type OMove<'GameState> =
 
 type MakeMove<'GameState> = MoveResult<'GameState> * Move -> MoveResult<'GameState>
 
-
 type GameState = IReadOnlyDictionary<SquarePosition, SquareState>
-
 
 let startGame: StartGame<GameState> = fun () ->
     let gameState =

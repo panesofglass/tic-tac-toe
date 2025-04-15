@@ -59,6 +59,6 @@ type OMove<'GameState> =
 
 type MakeMove<'GameState> = MoveResult<'GameState> * Move -> MoveResult<'GameState>
 
-val startGame: StartGame<'GameState>
+val startGame : StartGame<'GameState>
 
 val makeMove : MakeMove<'GameState>

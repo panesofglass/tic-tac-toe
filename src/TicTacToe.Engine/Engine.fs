@@ -86,36 +86,28 @@ let winningCombinations =
        [| TopLeft; MiddleCenter; BottomRight |]
        [| TopRight; MiddleCenter; BottomLeft |] |]
 
-let (|HasWinner|_|) (gameState: GameState) =
-    let getWinningPlayer (combination: SquarePosition[]) =
-        let allSquares =
-            combination
-            |> Array.choose (fun pos -> 
-                match gameState.TryGetValue(pos) with
-                | true, Taken player -> Some player
-                | _ -> None)
+let tryFindWinningPlayer (gameState: GameState) (combination: SquarePosition[]) =
+    let allSquares =
+        combination
+        |> Array.choose (fun pos -> 
+            match gameState.TryGetValue(pos) with
+            | true, Taken player -> Some player
+            | _ -> None)
 
-        if allSquares.Length = combination.Length && 
-           Array.forall (fun p -> p = allSquares[0]) allSquares then
-            Some allSquares[0]
-        else
-            None
-
-    winningCombinations
-    |> Array.tryPick getWinningPlayer
-
-let (|IsDraw|_|) (gameState: GameState) =
-    // First check if all squares are taken
-    let noEmptySquares = gameState.Values |> Seq.forall (fun state -> state <> Empty)
-    
-    // Then ensure there's no winner
-    if noEmptySquares then
-        // Check specifically for winners
-        match gameState with
-        | HasWinner _ -> None  // If there's a winner, it's not a draw
-        | _ -> Some()          // Full board with no winner = draw
+    if allSquares.Length = combination.Length && 
+        Array.forall (fun p -> p = allSquares[0]) allSquares then
+        Some allSquares[0]
     else
-        None                    // Board not full, not a draw
+        None
+
+let (|HasWinner|IsDraw|InProgress|) (gameState: GameState) =
+    match winningCombinations |> Array.tryPick (tryFindWinningPlayer gameState) with
+    | Some player -> HasWinner player
+    | None -> 
+        // First check if all squares are taken
+        let noEmptySquares = gameState.Values |> Seq.forall (fun state -> state <> Empty)
+        if noEmptySquares then IsDraw
+        else InProgress
 
 let moveX: XMove = fun (moveResult, XPos xPosition) ->
     match moveResult with
@@ -134,7 +126,7 @@ let moveX: XMove = fun (moveResult, XPos xPosition) ->
             // Then check for a draw
             | IsDraw -> 
                 Draw(gameState')
-            | _ ->
+            | InProgress ->
                 let validMovesForO: ValidMovesForO =
                     [| for KeyValue(pos, state) in gameState' do
                         if state = Empty then yield OPos pos |]

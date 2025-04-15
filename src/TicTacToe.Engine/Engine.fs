@@ -91,39 +91,27 @@ let rec tryFindWinningPlayer gameState =
 
 and tryFindWinningPlayerIter acc gameState =
     match acc with
-    | ValueSome player, _ -> ValueSome player
-    | ValueNone, [] -> ValueNone
     | ValueNone, combination::remainingCombinations ->
         match testCombination combination gameState with
         | ValueSome player -> ValueSome player
         | ValueNone -> tryFindWinningPlayerIter (ValueNone, remainingCombinations) gameState
+    | _ -> ValueNone
 
-and testCombination squares (gameState: GameState) =
-    match squares with
-    | [] -> ValueNone
-    | square::remaining ->
-        match gameState.TryGetValue(square) with
-        | true, Taken player -> testNextSquare (player, remaining) gameState
+and testCombination combination (gameState: GameState) =
+    match combination with
+    | [first;second;third] ->
+        match gameState.TryGetValue(first), gameState.TryGetValue(second), gameState.TryGetValue(third) with
+        | (true, Taken player1), (true, Taken player2), (true, Taken player3)
+            when player1 = player2 && player2 = player3 -> ValueSome player1
         | _ -> ValueNone
-
-and testNextSquare (player, squares) (gameState: GameState) =
-    match squares with
-    | [] -> ValueNone
-    | square::remaining ->
-        match gameState.TryGetValue(square) with
-        | true, Taken p when p = player ->
-            match remaining with
-            | [] -> ValueSome player
-            | _ -> testNextSquare (player, remaining) gameState
-        | _ -> ValueNone
+    | _ -> ValueNone
 
 let (|HasWinner|IsDraw|InProgress|) (gameState: GameState) =
     match tryFindWinningPlayer gameState with
     | ValueSome player -> HasWinner player
     | ValueNone -> 
-        // First check if all squares are taken
-        let noEmptySquares = gameState.Values |> Seq.forall (fun state -> state <> Empty)
-        if noEmptySquares then IsDraw
+        if gameState.Values |> Seq.forall (fun state -> state <> Empty)
+        then IsDraw
         else InProgress
 
 let moveX: XMove = fun (moveResult, XPos xPosition) ->
@@ -182,4 +170,4 @@ let makeMove: MakeMove = fun (moveResult, move) ->
         moveX (moveResult, XPos pos)
     | OTurn _, OMove pos ->
         moveO (moveResult, OPos pos)
-    | moveResult, _ -> moveResult
+    | _ -> moveResult

@@ -2,6 +2,8 @@ open System
 open System.IO.Compression
 open System.Text.Json.Serialization
 open System.Threading.Tasks
+open Microsoft.AspNetCore.Authentication
+open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.ResponseCompression
@@ -28,9 +30,27 @@ let jsonOptions =
 let configureServices (services: IServiceCollection) =
     services
         .AddRouting()
-        .AddLogging(fun builder -> builder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning) |> ignore)
+        .AddHttpContextAccessor()
+    |> ignore
+
+    services
+        .AddAuthorization()
         .AddAntiforgery()
+        .AddAuthentication(fun options ->
+            options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddCookie(fun options ->
+            options.Cookie.Name <- "TicTacToe.User"
+            options.Cookie.HttpOnly <- true
+            options.Cookie.SameSite <- SameSiteMode.Strict
+            options.Cookie.SecurePolicy <- CookieSecurePolicy.SameAsRequest
+            options.ExpireTimeSpan <- TimeSpan.FromDays(30.0)
+            options.SlidingExpiration <- true
+        )
+    |> ignore
+
+    services
         .AddOxpecker()
+        .AddSingleton<IClaimsTransformation, GameUserClaimsTransformation>()
         .AddSingleton<IJsonSerializer>(SystemTextJsonSerializer(jsonOptions))
         .AddResponseCompression(fun opts ->
             opts.EnableForHttps <- true
@@ -116,12 +136,22 @@ let main args =
         useDefaults
 
         service configureServices
+        logging (fun builder ->
+            // Configure standard Microsoft logging
+            builder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning) |> ignore
+            // Configure application authentication logging
+            builder.AddFilter("TicTacToe.Web.Auth", LogLevel.Information) |> ignore
+            builder.AddFilter("TicTacToe.Web.GameUserClaimsTransformation", LogLevel.Debug) |> ignore
+            builder
+        )
 
         plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
         plugWhenNot isDevelopment (fun app -> ExceptionHandlerExtensions.UseExceptionHandler(app, "/error", true))
 
         plug ResponseCompressionBuilderExtensions.UseResponseCompression
         plug StaticFileExtensions.UseStaticFiles
+        plug AuthAppBuilderExtensions.UseAuthentication
+        plug AuthorizationAppBuilderExtensions.UseAuthorization
         plug AntiforgeryApplicationBuilderExtensions.UseAntiforgery
 
         resource home

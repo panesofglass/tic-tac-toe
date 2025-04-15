@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="Extensions.fs" />
+    <Compile Include="Auth.fs" />
     <Compile Include="Models.fs" />
     <Compile Include="DatastarHelpers.fs" />
     <Compile Include="DatastarAttrs.fs" />

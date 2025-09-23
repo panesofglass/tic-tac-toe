@@ -14,6 +14,7 @@ open Microsoft.Extensions.Logging
 open Oxpecker
 open Frank.Builder
 open StarFederation.Datastar
+open StarFederation.Datastar.FSharp
 open TicTacToe.Web
 open TicTacToe.Web.DatastarExtensions
 open TicTacToe.Web.Extensions
@@ -50,6 +51,7 @@ let configureServices (services: IServiceCollection) =
 
     services
         .AddOxpecker()
+        .AddDatastar()
         .AddSingleton<IClaimsTransformation, GameUserClaimsTransformation>()
         .AddSingleton<IJsonSerializer>(SystemTextJsonSerializer(jsonOptions))
         .AddResponseCompression(fun opts ->
@@ -87,19 +89,20 @@ let htmlView' f (ctx: HttpContext) = f ctx |> layout.html ctx |> ctx.WriteHtmlVi
 let Message = "Hello world"
 
 let messageView' (ctx: HttpContext) =
-    let datastar = Datastar(ctx)
+    let datastar = ctx.RequestServices.GetRequiredService<ServerSentEventGenerator>()
+    do datastar.StartServerEventStreamAsync() |> ignore
 
-    let htmlopts = { MergeFragmentsOptions.defaults with MergeMode = Append; Selector = ValueSome "#remote-text" }
+    let htmlopts = { PatchElementsOptions.Defaults with PatchMode = Append; Selector = ValueSome "#remote-text" }
 
     task {
-        let! signals = datastar.Signals.ReadSignalsOrFail<HomeSignal>(jsonOptions)
+        let! signals = datastar.ReadSignalsOrFailAsync<HomeSignal>(jsonOptions)
 
         for i = 0 to Message.Length do
             let html = Message.Substring(0, Message.Length - i) |> home.msgFragment
-            do! datastar.WriteHtmlFragment(html, htmlopts)
+            do! datastar.PatchHtmlViewAsync(html, htmlopts)
             do! Task.Delay(TimeSpan.FromMilliseconds(signals.Delay))
 
-        return! datastar.WriteHtmlFragment(home.msgFragment "Done", htmlopts)
+        return! datastar.PatchHtmlViewAsync(home.msgFragment "Done", htmlopts)
     }
     :> Task
 

@@ -29,7 +29,7 @@ module layout =
 
                 script (
                     type' = "module",
-                    src = "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-beta.11/bundles/datastar.js",
+                    src = "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.5/bundles/datastar.js",
                     crossorigin = "anonymous"
                 )
             }

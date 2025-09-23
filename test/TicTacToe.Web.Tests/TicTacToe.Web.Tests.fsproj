@@ -12,10 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="9.0.303" />
     <PackageReference Include="Expecto" Version="10.*" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication" Version="2.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.15.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
   </ItemGroup>

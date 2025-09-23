@@ -1,21 +1,21 @@
 module TicTacToe.Web.DatastarExtensions
 
-open System.Runtime.CompilerServices
+open System.Text.Json
+open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
-open StarFederation.Datastar
-open System.Text.Json
+open Microsoft.Extensions.DependencyInjection
+open StarFederation.Datastar.FSharp
 
-type SignalsHttpHandlers with
+type ServerSentEventGenerator with
 
     /// <summary>
     /// Read the client signals from the query string as a Json string and Deserialize
     /// </summary>
     /// <returns>Returns an instance of `'T`.</returns>
-    [<Extension>]
-    member __.ReadSignalsOrFail<'T>(jsonSerializerOptions: JsonSerializerOptions) : Task<'T> =
+    member __.ReadSignalsOrFailAsync<'T>(jsonSerializerOptions: JsonSerializerOptions) : Task<'T> =
         task {
-            let! signalsVopt = (__ :> IReadSignals).ReadSignals<'T>(jsonSerializerOptions)
+            let! signalsVopt = __.ReadSignalsAsync<'T>(jsonSerializerOptions)
 
             let signals =
                 match signalsVopt with
@@ -25,28 +25,30 @@ type SignalsHttpHandlers with
             return signals
         }
 
-type Datastar(ctx: HttpContext) =
-    let _sse = ServerSentEventHttpHandlers ctx.Response
-    do _sse.StartResponse() |> ignore
-
-    member __.Signals = SignalsHttpHandlers ctx.Request
-
-    member __.WriteHtmlFragment(htmlView, ?options) =
+    member __.PatchHtmlViewAsync(htmlView, ?options: PatchElementsOptions) =
         let fragment = htmlView |> Oxpecker.ViewEngine.Render.toString
-        ServerSentEventGenerator.MergeFragments (_sse, fragment, ?options = options)
+        match options with
+        | Some options ->
+            __.PatchElementsAsync(fragment, options)
+        | None ->
+            __.PatchElementsAsync(fragment)
 
-    member __.RemoveHtmlFragment(selector, ?options) =
-        ServerSentEventGenerator.RemoveFragments (_sse, selector, ?options = options)
-
-    member __.MergeSignal(signals, ?options, ?jsonSerializerOptions: JsonSerializerOptions) =
+    member __.PatchSignalsAsync(signals, ?options: PatchSignalsOptions, ?jsonSerializerOptions: JsonSerializerOptions) =
         let json =
             match jsonSerializerOptions with
             | Some opts -> JsonSerializer.Serialize(signals, opts)
             | None -> JsonSerializer.Serialize(signals)
 
-        ServerSentEventGenerator.MergeSignals (_sse, json, ?options = options)
+        match options with
+        | Some opts ->
+            __.PatchSignalsAsync(json, opts)
+        | None ->
+            __.PatchSignalsAsync(json)
 
-    member __.RemoveSignal(paths, ?options) = ServerSentEventGenerator.RemoveSignals (_sse, paths, ?options = options)
-
-    member __.ExecuteScript(script, ?options) =
-        ServerSentEventGenerator.ExecuteScript (_sse, script, ?options = options)
+type IServiceCollection with
+    member this.AddDatastar() =
+        this.AddHttpContextAccessor()
+            .AddScoped<ServerSentEventGenerator>(fun svc -> 
+                let httpContextAccessor = svc.GetService<IHttpContextAccessor>()
+                ServerSentEventGenerator(httpContextAccessor)
+            )

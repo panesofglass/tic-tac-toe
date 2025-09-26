@@ -1,7 +1,6 @@
 module TicTacToe.Web.DatastarExtensions
 
 open System.Text.Json
-open System.Threading
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
@@ -27,11 +26,10 @@ type ServerSentEventGenerator with
 
     member __.PatchHtmlViewAsync(htmlView, ?options: PatchElementsOptions) =
         let fragment = htmlView |> Oxpecker.ViewEngine.Render.toString
+
         match options with
-        | Some options ->
-            __.PatchElementsAsync(fragment, options)
-        | None ->
-            __.PatchElementsAsync(fragment)
+        | Some options -> __.PatchElementsAsync(fragment, options)
+        | None -> __.PatchElementsAsync(fragment)
 
     member __.PatchSignalsAsync(signals, ?options: PatchSignalsOptions, ?jsonSerializerOptions: JsonSerializerOptions) =
         let json =
@@ -40,15 +38,13 @@ type ServerSentEventGenerator with
             | None -> JsonSerializer.Serialize(signals)
 
         match options with
-        | Some opts ->
-            __.PatchSignalsAsync(json, opts)
-        | None ->
-            __.PatchSignalsAsync(json)
+        | Some opts -> __.PatchSignalsAsync(json, opts)
+        | None -> __.PatchSignalsAsync(json)
 
 type IServiceCollection with
     member this.AddDatastar() =
-        this.AddHttpContextAccessor()
-            .AddScoped<ServerSentEventGenerator>(fun svc -> 
+        this
+            .AddHttpContextAccessor()
+            .AddScoped<ServerSentEventGenerator>(fun svc ->
                 let httpContextAccessor = svc.GetService<IHttpContextAccessor>()
-                ServerSentEventGenerator(httpContextAccessor)
-            )
+                ServerSentEventGenerator(httpContextAccessor))

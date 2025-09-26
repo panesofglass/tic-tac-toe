@@ -13,7 +13,6 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open Oxpecker
 open Frank.Builder
-open StarFederation.Datastar
 open StarFederation.Datastar.FSharp
 open TicTacToe.Web
 open TicTacToe.Web.DatastarExtensions
@@ -29,24 +28,19 @@ let jsonOptions =
         .ToJsonSerializerOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)
 
 let configureServices (services: IServiceCollection) =
-    services
-        .AddRouting()
-        .AddHttpContextAccessor()
-    |> ignore
+    services.AddRouting().AddHttpContextAccessor() |> ignore
 
     services
         .AddAuthorization()
         .AddAntiforgery()
-        .AddAuthentication(fun options ->
-            options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddAuthentication(fun options -> options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(fun options ->
             options.Cookie.Name <- "TicTacToe.User"
             options.Cookie.HttpOnly <- true
             options.Cookie.SameSite <- SameSiteMode.Strict
             options.Cookie.SecurePolicy <- CookieSecurePolicy.SameAsRequest
             options.ExpireTimeSpan <- TimeSpan.FromDays(30.0)
-            options.SlidingExpiration <- true
-        )
+            options.SlidingExpiration <- true)
     |> ignore
 
     services
@@ -67,23 +61,21 @@ let configureServices (services: IServiceCollection) =
                 )
 
             opts.Providers.Add<BrotliCompressionProvider>()
-            opts.Providers.Add<GzipCompressionProvider>()
-        )
+            opts.Providers.Add<GzipCompressionProvider>())
     |> ignore
 
     services.Configure<BrotliCompressionProviderOptions>(fun (opts: BrotliCompressionProviderOptions) ->
-        opts.Level <- CompressionLevel.Fastest
-    )
+        opts.Level <- CompressionLevel.Fastest)
     |> ignore
 
     services.Configure<GzipCompressionProviderOptions>(fun (opts: GzipCompressionProviderOptions) ->
-        opts.Level <- CompressionLevel.SmallestSize
-    )
+        opts.Level <- CompressionLevel.SmallestSize)
     |> ignore
 
     services
 
-let htmlView' f (ctx: HttpContext) = f ctx |> layout.html ctx |> ctx.WriteHtmlView
+let htmlView' f (ctx: HttpContext) =
+    f ctx |> layout.html ctx |> ctx.WriteHtmlView
 
 [<Literal>]
 let Message = "Hello world"
@@ -92,7 +84,10 @@ let messageView' (ctx: HttpContext) =
     let datastar = ctx.RequestServices.GetRequiredService<ServerSentEventGenerator>()
     do datastar.StartServerEventStreamAsync() |> ignore
 
-    let htmlopts = { PatchElementsOptions.Defaults with PatchMode = Append; Selector = ValueSome "#remote-text" }
+    let htmlopts =
+        { PatchElementsOptions.Defaults with
+            PatchMode = Append
+            Selector = ValueSome "#remote-text" }
 
     task {
         let! signals = datastar.ReadSignalsOrFailAsync<HomeSignal>(jsonOptions)
@@ -113,12 +108,12 @@ let graph =
         get (fun (ctx: HttpContext) ->
             let graphWriter = ctx.RequestServices.GetRequiredService<DfaGraphWriter>()
 
-            let endpointDataSource = ctx.RequestServices.GetRequiredService<EndpointDataSource>()
+            let endpointDataSource =
+                ctx.RequestServices.GetRequiredService<EndpointDataSource>()
 
             use sw = new IO.StringWriter()
             graphWriter.Write(endpointDataSource, sw)
-            ctx.Response.WriteAsync(sw.ToString())
-        )
+            ctx.Response.WriteAsync(sw.ToString()))
     }
 
 let home =
@@ -139,14 +134,17 @@ let main args =
         useDefaults
 
         service configureServices
+
         logging (fun builder ->
             // Configure standard Microsoft logging
             builder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning) |> ignore
             // Configure application authentication logging
             builder.AddFilter("TicTacToe.Web.Auth", LogLevel.Information) |> ignore
-            builder.AddFilter("TicTacToe.Web.GameUserClaimsTransformation", LogLevel.Debug) |> ignore
-            builder
-        )
+
+            builder.AddFilter("TicTacToe.Web.GameUserClaimsTransformation", LogLevel.Debug)
+            |> ignore
+
+            builder)
 
         plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
         plugWhenNot isDevelopment (fun app -> ExceptionHandlerExtensions.UseExceptionHandler(app, "/error", true))

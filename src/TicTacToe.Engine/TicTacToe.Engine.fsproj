@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="9.0.303" />
+    <PackageReference Include="System.Threading.Channels" Version="9.0.9" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,9 @@
-﻿module TicTacToe.Engine
+module TicTacToe.Engine
 
+open System
 open System.Collections.Generic
+open System.Threading.Channels
+open System.Threading.Tasks
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -17,7 +20,9 @@ type SquarePosition =
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
-type Player = X | O
+type Player =
+    | X
+    | O
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -60,22 +65,26 @@ type StartGame = unit -> MoveResult
 
 type MakeMove = MoveResult * Move -> MoveResult
 
-let startGame: StartGame = fun () ->
-    let gameState =
-        [| TopLeft, Empty
-           TopCenter, Empty
-           TopRight, Empty
-           MiddleLeft, Empty
-           MiddleCenter, Empty
-           MiddleRight, Empty
-           BottomLeft, Empty
-           BottomCenter, Empty
-           BottomRight, Empty |]
-        |> readOnlyDict
-    let validMovesForX: ValidMovesForX =
-        [| for KeyValue(pos, state) in gameState do
-            if state = Empty then yield XPos pos |]
-    XTurn (gameState, validMovesForX)
+let startGame: StartGame =
+    fun () ->
+        let gameState =
+            [| TopLeft, Empty
+               TopCenter, Empty
+               TopRight, Empty
+               MiddleLeft, Empty
+               MiddleCenter, Empty
+               MiddleRight, Empty
+               BottomLeft, Empty
+               BottomCenter, Empty
+               BottomRight, Empty |]
+            |> readOnlyDict
+
+        let validMovesForX: ValidMovesForX =
+            [| for KeyValue(pos, state) in gameState do
+                   if state = Empty then
+                       yield XPos pos |]
+
+        XTurn(gameState, validMovesForX)
 
 let winningCombinations =
     [ [ TopLeft; TopCenter; TopRight ]
@@ -92,7 +101,7 @@ let rec tryFindWinningPlayer gameState =
 
 and tryFindWinningPlayerIter acc gameState =
     match acc with
-    | ValueNone, combination::remainingCombinations ->
+    | ValueNone, combination :: remainingCombinations ->
         match testCombination combination gameState with
         | ValueSome player -> ValueSome player
         | ValueNone -> tryFindWinningPlayerIter (ValueNone, remainingCombinations) gameState
@@ -100,85 +109,167 @@ and tryFindWinningPlayerIter acc gameState =
 
 and testCombination combination (gameState: GameState) =
     match combination with
-    | [first;second;third] ->
+    | [ first; second; third ] ->
         match gameState.TryGetValue(first), gameState.TryGetValue(second), gameState.TryGetValue(third) with
-        | (true, Taken player1), (true, Taken player2), (true, Taken player3)
-            when player1 = player2 && player2 = player3 -> ValueSome player1
+        | (true, Taken player1), (true, Taken player2), (true, Taken player3) when
+            player1 = player2 && player2 = player3
+            ->
+            ValueSome player1
         | _ -> ValueNone
     | _ -> ValueNone
 
 let (|HasWinner|IsDraw|InProgress|) (gameState: GameState) =
     match tryFindWinningPlayer gameState with
     | ValueSome player -> HasWinner player
-    | ValueNone -> 
-        if gameState.Values |> Seq.forall (fun state -> state <> Empty)
-        then IsDraw
-        else InProgress
+    | ValueNone ->
+        if gameState.Values |> Seq.forall (fun state -> state <> Empty) then
+            IsDraw
+        else
+            InProgress
 
-let moveX: XMove = fun (moveResult, XPos xPosition) ->
-    match moveResult with
-    | XTurn (gameState, _) ->
-        match gameState.TryGetValue(xPosition) with
-        | true, Empty ->
-            let gameState' =
-                [| for KeyValue(pos, state) in gameState ->
-                    pos, if pos = xPosition then Taken X else state |]
-                |> readOnlyDict
+let moveX: XMove =
+    fun (moveResult, XPos xPosition) ->
+        match moveResult with
+        | XTurn(gameState, _) ->
+            match gameState.TryGetValue(xPosition) with
+            | true, Empty ->
+                let gameState' =
+                    [| for KeyValue(pos, state) in gameState -> pos, if pos = xPosition then Taken X else state |]
+                    |> readOnlyDict
 
-            // First check for a winner
-            match gameState' with
-            | HasWinner player -> 
-                Won(gameState', player)
-            // Then check for a draw
-            | IsDraw -> 
-                Draw(gameState')
-            | InProgress ->
-                let validMovesForO: ValidMovesForO =
-                    [| for KeyValue(pos, state) in gameState' do
-                        if state = Empty then yield OPos pos |]
-                OTurn(gameState', validMovesForO)
-        | _ -> Error(gameState, "Invalid move")
-    | OTurn(gameState, _) -> Error(gameState, "Invalid move")
-    | Won(gameState, _) -> Error(gameState, "Game already won")
-    | Draw gameState -> Error(gameState, "Game over")
-    | _ -> moveResult
+                // First check for a winner
+                match gameState' with
+                | HasWinner player -> Won(gameState', player)
+                // Then check for a draw
+                | IsDraw -> Draw(gameState')
+                | InProgress ->
+                    let validMovesForO: ValidMovesForO =
+                        [| for KeyValue(pos, state) in gameState' do
+                               if state = Empty then
+                                   yield OPos pos |]
 
-let moveO: OMove = fun (moveResult, OPos oPosition) ->
-    match moveResult with
-    | OTurn (gameState, _) ->
-        match gameState.TryGetValue(oPosition) with
-        | true, Empty ->
-            let gameState' =
-                [| for KeyValue(pos, state) in gameState ->
-                    pos, if pos = oPosition then Taken O else state |]
-                |> readOnlyDict
+                    OTurn(gameState', validMovesForO)
+            | _ -> Error(gameState, "Invalid move")
+        | OTurn(gameState, _) -> Error(gameState, "Invalid move")
+        | Won(gameState, _) -> Error(gameState, "Game already won")
+        | Draw gameState -> Error(gameState, "Game over")
+        | _ -> moveResult
 
-            // First check for a winner
-            match gameState' with
-            | HasWinner player -> 
-                Won(gameState', player)
-            // Then check for a draw
-            | IsDraw -> 
-                Draw(gameState')
-            | InProgress ->
-                let validMovesForX: ValidMovesForX =
-                    [| for KeyValue(pos, state) in gameState' do
-                        if state = Empty then yield XPos pos |]
-                XTurn(gameState', validMovesForX)
-        | _ -> Error(gameState, "Invalid move")
-    | XTurn(gameState, _) -> Error(gameState, "Invalid move")
-    | Won(gameState, _) -> Error(gameState, "Game already won")
-    | Draw gameState -> Error(gameState, "Game over")
-    | _ -> moveResult
+let moveO: OMove =
+    fun (moveResult, OPos oPosition) ->
+        match moveResult with
+        | OTurn(gameState, _) ->
+            match gameState.TryGetValue(oPosition) with
+            | true, Empty ->
+                let gameState' =
+                    [| for KeyValue(pos, state) in gameState -> pos, if pos = oPosition then Taken O else state |]
+                    |> readOnlyDict
 
-let makeMove: MakeMove = fun (moveResult, move) ->
-    match moveResult, move with
-    | XTurn _, XMove pos ->
-        moveX (moveResult, XPos pos)
-    | XTurn(gameState, _), _ -> Error(gameState, "Invalid move")
-    | OTurn _, OMove pos ->
-        moveO (moveResult, OPos pos)
-    | OTurn(gameState, _), _ -> Error(gameState, "Invalid move")
-    | Won(gameState, _), _ -> Error(gameState, "Game already won")
-    | Draw gameState, _ -> Error(gameState, "Game over")
-    | _ -> moveResult
+                // First check for a winner
+                match gameState' with
+                | HasWinner player -> Won(gameState', player)
+                // Then check for a draw
+                | IsDraw -> Draw(gameState')
+                | InProgress ->
+                    let validMovesForX: ValidMovesForX =
+                        [| for KeyValue(pos, state) in gameState' do
+                               if state = Empty then
+                                   yield XPos pos |]
+
+                    XTurn(gameState', validMovesForX)
+            | _ -> Error(gameState, "Invalid move")
+        | XTurn(gameState, _) -> Error(gameState, "Invalid move")
+        | Won(gameState, _) -> Error(gameState, "Game already won")
+        | Draw gameState -> Error(gameState, "Game over")
+        | _ -> moveResult
+
+let makeMove: MakeMove =
+    fun (moveResult, move) ->
+        match moveResult, move with
+        | XTurn _, XMove pos -> moveX (moveResult, XPos pos)
+        | XTurn(gameState, _), _ -> Error(gameState, "Invalid move")
+        | OTurn _, OMove pos -> moveO (moveResult, OPos pos)
+        | OTurn(gameState, _), _ -> Error(gameState, "Invalid move")
+        | Won(gameState, _), _ -> Error(gameState, "Game already won")
+        | Draw gameState, _ -> Error(gameState, "Game over")
+        | _ -> moveResult
+
+
+type Game =
+    inherit System.IDisposable
+    abstract MakeMoveAsync: Move -> System.Threading.Tasks.Task
+    abstract ReadAllAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
+
+/// Internal message type for the game actor
+type internal GameMessage =
+    | MoveMessage of Move * TaskCompletionSource<unit>
+    | Dispose
+
+/// Game actor implementation using bounded channels
+type internal GameActor(channelCapacity: int) =
+    let channel = Channel.CreateBounded<MoveResult>(channelCapacity)
+    let messageChannel = Channel.CreateUnbounded<GameMessage>()
+    let mutable disposed = false
+
+    let rec messageLoop state () : Task =
+        task {
+            try
+                let! hasMessage = messageChannel.Reader.WaitToReadAsync()
+
+                if hasMessage && not disposed then
+                    let! message = messageChannel.Reader.ReadAsync()
+
+                    match message with
+                    | MoveMessage(move, tcs) ->
+                        let newState = makeMove (state, move)
+
+                        // Write result to channel
+                        do! channel.Writer.WriteAsync(newState)
+
+                        // Check if game should end
+                        match newState with
+                        | Won _
+                        | Draw _ ->
+                            channel.Writer.Complete()
+                            disposed <- true
+                            tcs.SetResult(())
+                        | _ ->
+                            tcs.SetResult(())
+                            return! messageLoop state ()
+
+                    | Dispose ->
+                        channel.Writer.Complete()
+                        disposed <- true
+            with ex ->
+                channel.Writer.Complete(ex)
+                disposed <- true
+        }
+
+    do
+        let initialState = startGame ()
+        // Send initial state to channel
+        channel.Writer.TryWrite(initialState) |> ignore
+        // Start message processing loop
+        Task.Run(messageLoop initialState) |> ignore
+
+    interface Game with
+        member _.MakeMoveAsync(move: Move) : Task =
+            if disposed then
+                Task.FromException(ObjectDisposedException("Game"))
+            else
+                let tcs = TaskCompletionSource<unit>()
+                let message = MoveMessage(move, tcs)
+
+                if messageChannel.Writer.TryWrite(message) then
+                    tcs.Task
+                else
+                    Task.FromException(InvalidOperationException("Game message queue is closed"))
+
+        member _.ReadAllAsync() : Collections.Generic.IAsyncEnumerable<MoveResult> = channel.Reader.ReadAllAsync()
+
+        member _.Dispose() =
+            if not disposed then
+                messageChannel.Writer.TryWrite(Dispose) |> ignore
+                messageChannel.Writer.Complete()
+
+let createGame () : Game = new GameActor(3) :> Game

@@ -17,7 +17,9 @@ type SquarePosition =
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
-type Player = X | O
+type Player =
+    | X
+    | O
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -56,6 +58,21 @@ type StartGame = unit -> MoveResult
 
 type MakeMove = MoveResult * Move -> MoveResult
 
-val startGame : StartGame
+val startGame: StartGame
 
-val makeMove : MakeMove
+val makeMove: MakeMove
+
+/// A game actor that manages a single game instance using bounded channels
+/// Implements the actor pattern for handling moves asynchronously
+type Game =
+    inherit System.IDisposable
+
+    /// Make a move in the game asynchronously
+    abstract MakeMoveAsync: Move -> System.Threading.Tasks.Task
+
+    /// Read all game state changes as an async enumerable
+    abstract ReadAllAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
+
+/// Create a new game instance
+/// Game automatically starts when created
+val createGame: unit -> Game

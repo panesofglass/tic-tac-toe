@@ -197,79 +197,82 @@ let makeMove: MakeMove =
 
 type Game =
     inherit System.IDisposable
-    abstract MakeMoveAsync: Move -> System.Threading.Tasks.Task
-    abstract ReadAllAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
+    abstract MakeMove: Move -> unit
+    abstract GetResultsAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
 
 /// Internal message type for the game actor
 type internal GameMessage =
-    | MoveMessage of Move * TaskCompletionSource<unit>
+    | MakeMove of Move
     | Dispose
 
+[<Literal>]
+let MaxMoves = 9
+
 /// Game actor implementation using bounded channels
-type internal GameActor(channelCapacity: int) =
-    let channel = Channel.CreateBounded<MoveResult>(channelCapacity)
-    let messageChannel = Channel.CreateUnbounded<GameMessage>()
+type internal GameActor(inboxCapacity: int) =
+    let inbox = Channel.CreateBounded<GameMessage>(inboxCapacity)
+    let outbox = Channel.CreateBounded<MoveResult>(MaxMoves)
     let mutable disposed = false
 
     let rec messageLoop state () : Task =
         task {
             try
-                let! hasMessage = messageChannel.Reader.WaitToReadAsync()
+                let! hasMessage = inbox.Reader.WaitToReadAsync()
 
                 if hasMessage && not disposed then
-                    let! message = messageChannel.Reader.ReadAsync()
+                    let! message = inbox.Reader.ReadAsync()
 
                     match message with
-                    | MoveMessage(move, tcs) ->
+                    | MakeMove(move) ->
                         let newState = makeMove (state, move)
 
                         // Write result to channel
-                        do! channel.Writer.WriteAsync(newState)
+                        do! outbox.Writer.WriteAsync(newState)
 
                         // Check if game should end
                         match newState with
                         | Won _
                         | Draw _ ->
-                            channel.Writer.Complete()
+                            outbox.Writer.Complete()
                             disposed <- true
-                            tcs.SetResult(())
-                        | _ ->
-                            tcs.SetResult(())
-                            return! messageLoop state ()
+                        | _ -> return! messageLoop newState ()
 
                     | Dispose ->
-                        channel.Writer.Complete()
+                        outbox.Writer.Complete()
                         disposed <- true
             with ex ->
-                channel.Writer.Complete(ex)
+                outbox.Writer.Complete(ex)
                 disposed <- true
         }
 
     do
         let initialState = startGame ()
         // Send initial state to channel
-        channel.Writer.TryWrite(initialState) |> ignore
+        outbox.Writer.TryWrite(initialState) |> ignore
         // Start message processing loop
         Task.Run(messageLoop initialState) |> ignore
 
     interface Game with
-        member _.MakeMoveAsync(move: Move) : Task =
+        member _.MakeMove(move: Move) =
             if disposed then
-                Task.FromException(ObjectDisposedException("Game"))
+                raise (ObjectDisposedException("Game"))
             else
-                let tcs = TaskCompletionSource<unit>()
-                let message = MoveMessage(move, tcs)
+                let message = MakeMove(move)
 
-                if messageChannel.Writer.TryWrite(message) then
-                    tcs.Task
+                if inbox.Writer.TryWrite(message) then
+                    ()
                 else
-                    Task.FromException(InvalidOperationException("Game message queue is closed"))
+                    raise (
+                        InvalidOperationException(
+                            "Game message queue is full. Please wait and try again in a few moments."
+                        )
+                    )
 
-        member _.ReadAllAsync() : Collections.Generic.IAsyncEnumerable<MoveResult> = channel.Reader.ReadAllAsync()
+        member _.GetResultsAsync() : Collections.Generic.IAsyncEnumerable<MoveResult> = outbox.Reader.ReadAllAsync()
 
         member _.Dispose() =
             if not disposed then
-                messageChannel.Writer.TryWrite(Dispose) |> ignore
-                messageChannel.Writer.Complete()
+                inbox.Writer.TryWrite(Dispose) |> ignore
+                inbox.Writer.Complete()
 
 let createGame () : Game = new GameActor(3) :> Game

@@ -67,11 +67,11 @@ val makeMove: MakeMove
 type Game =
     inherit System.IDisposable
 
-    /// Make a move in the game asynchronously
-    abstract MakeMoveAsync: Move -> System.Threading.Tasks.Task
+    /// Make a move in the game
+    abstract MakeMove: Move -> unit
 
     /// Read all game state changes as an async enumerable
-    abstract ReadAllAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
+    abstract GetResultsAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
 
 /// Create a new game instance
 /// Game automatically starts when created

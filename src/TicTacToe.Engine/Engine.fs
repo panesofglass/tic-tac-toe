@@ -1,217 +1,29 @@
 module TicTacToe.Engine
 
 open System
-open System.Collections.Generic
+open System.Reactive.Subjects
 open System.Threading.Channels
 open System.Threading.Tasks
-
-[<StructuralEquality; StructuralComparison>]
-[<Struct>]
-type SquarePosition =
-    | TopLeft
-    | TopCenter
-    | TopRight
-    | MiddleLeft
-    | MiddleCenter
-    | MiddleRight
-    | BottomLeft
-    | BottomCenter
-    | BottomRight
-
-[<StructuralEquality; StructuralComparison>]
-[<Struct>]
-type Player =
-    | X
-    | O
-
-[<StructuralEquality; StructuralComparison>]
-[<Struct>]
-type SquareState =
-    | Taken of Player
-    | Empty
-
-[<StructuralEquality; StructuralComparison>]
-[<Struct>]
-type XPosition = XPos of SquarePosition
-
-[<StructuralEquality; StructuralComparison>]
-[<Struct>]
-type OPosition = OPos of SquarePosition
-
-type ValidMovesForX = XPosition[]
-
-type ValidMovesForO = OPosition[]
-
-type GameState = IReadOnlyDictionary<SquarePosition, SquareState>
-
-type MoveResult =
-    | XTurn of GameState * ValidMovesForX
-    | OTurn of GameState * ValidMovesForO
-    | Won of GameState * Player
-    | Draw of GameState
-    | Error of GameState * string
-
-[<StructuralEquality; StructuralComparison>]
-[<Struct>]
-type Move =
-    | XMove of SquarePosition
-    | OMove of SquarePosition
-
-type XMove = MoveResult * XPosition -> MoveResult
-
-type OMove = MoveResult * OPosition -> MoveResult
-
-type StartGame = unit -> MoveResult
-
-type MakeMove = MoveResult * Move -> MoveResult
-
-let startGame: StartGame =
-    fun () ->
-        let gameState =
-            [| TopLeft, Empty
-               TopCenter, Empty
-               TopRight, Empty
-               MiddleLeft, Empty
-               MiddleCenter, Empty
-               MiddleRight, Empty
-               BottomLeft, Empty
-               BottomCenter, Empty
-               BottomRight, Empty |]
-            |> readOnlyDict
-
-        let validMovesForX: ValidMovesForX =
-            [| for KeyValue(pos, state) in gameState do
-                   if state = Empty then
-                       yield XPos pos |]
-
-        XTurn(gameState, validMovesForX)
-
-let winningCombinations =
-    [ [ TopLeft; TopCenter; TopRight ]
-      [ MiddleLeft; MiddleCenter; MiddleRight ]
-      [ BottomLeft; BottomCenter; BottomRight ]
-      [ TopLeft; MiddleLeft; BottomLeft ]
-      [ TopCenter; MiddleCenter; BottomCenter ]
-      [ TopRight; MiddleRight; BottomRight ]
-      [ TopLeft; MiddleCenter; BottomRight ]
-      [ TopRight; MiddleCenter; BottomLeft ] ]
-
-let rec tryFindWinningPlayer gameState =
-    tryFindWinningPlayerIter (ValueNone, winningCombinations) gameState
-
-and tryFindWinningPlayerIter acc gameState =
-    match acc with
-    | ValueNone, combination :: remainingCombinations ->
-        match testCombination combination gameState with
-        | ValueSome player -> ValueSome player
-        | ValueNone -> tryFindWinningPlayerIter (ValueNone, remainingCombinations) gameState
-    | _ -> ValueNone
-
-and testCombination combination (gameState: GameState) =
-    match combination with
-    | [ first; second; third ] ->
-        match gameState.TryGetValue(first), gameState.TryGetValue(second), gameState.TryGetValue(third) with
-        | (true, Taken player1), (true, Taken player2), (true, Taken player3) when
-            player1 = player2 && player2 = player3
-            ->
-            ValueSome player1
-        | _ -> ValueNone
-    | _ -> ValueNone
-
-let (|HasWinner|IsDraw|InProgress|) (gameState: GameState) =
-    match tryFindWinningPlayer gameState with
-    | ValueSome player -> HasWinner player
-    | ValueNone ->
-        if gameState.Values |> Seq.forall (fun state -> state <> Empty) then
-            IsDraw
-        else
-            InProgress
-
-let moveX: XMove =
-    fun (moveResult, XPos xPosition) ->
-        match moveResult with
-        | XTurn(gameState, _) ->
-            match gameState.TryGetValue(xPosition) with
-            | true, Empty ->
-                let gameState' =
-                    [| for KeyValue(pos, state) in gameState -> pos, if pos = xPosition then Taken X else state |]
-                    |> readOnlyDict
-
-                // First check for a winner
-                match gameState' with
-                | HasWinner player -> Won(gameState', player)
-                // Then check for a draw
-                | IsDraw -> Draw(gameState')
-                | InProgress ->
-                    let validMovesForO: ValidMovesForO =
-                        [| for KeyValue(pos, state) in gameState' do
-                               if state = Empty then
-                                   yield OPos pos |]
-
-                    OTurn(gameState', validMovesForO)
-            | _ -> Error(gameState, "Invalid move")
-        | OTurn(gameState, _) -> Error(gameState, "Invalid move")
-        | Won(gameState, _) -> Error(gameState, "Game already won")
-        | Draw gameState -> Error(gameState, "Game over")
-        | _ -> moveResult
-
-let moveO: OMove =
-    fun (moveResult, OPos oPosition) ->
-        match moveResult with
-        | OTurn(gameState, _) ->
-            match gameState.TryGetValue(oPosition) with
-            | true, Empty ->
-                let gameState' =
-                    [| for KeyValue(pos, state) in gameState -> pos, if pos = oPosition then Taken O else state |]
-                    |> readOnlyDict
-
-                // First check for a winner
-                match gameState' with
-                | HasWinner player -> Won(gameState', player)
-                // Then check for a draw
-                | IsDraw -> Draw(gameState')
-                | InProgress ->
-                    let validMovesForX: ValidMovesForX =
-                        [| for KeyValue(pos, state) in gameState' do
-                               if state = Empty then
-                                   yield XPos pos |]
-
-                    XTurn(gameState', validMovesForX)
-            | _ -> Error(gameState, "Invalid move")
-        | XTurn(gameState, _) -> Error(gameState, "Invalid move")
-        | Won(gameState, _) -> Error(gameState, "Game already won")
-        | Draw gameState -> Error(gameState, "Game over")
-        | _ -> moveResult
-
-let makeMove: MakeMove =
-    fun (moveResult, move) ->
-        match moveResult, move with
-        | XTurn _, XMove pos -> moveX (moveResult, XPos pos)
-        | XTurn(gameState, _), _ -> Error(gameState, "Invalid move")
-        | OTurn _, OMove pos -> moveO (moveResult, OPos pos)
-        | OTurn(gameState, _), _ -> Error(gameState, "Invalid move")
-        | Won(gameState, _), _ -> Error(gameState, "Game already won")
-        | Draw gameState, _ -> Error(gameState, "Game over")
-        | _ -> moveResult
-
+open TicTacToe.Model
 
 type Game =
-    inherit System.IDisposable
+    inherit IDisposable
+    inherit IObservable<MoveResult>
     abstract MakeMove: Move -> unit
-    abstract GetResultsAsync: unit -> System.Collections.Generic.IAsyncEnumerable<MoveResult>
 
 /// Internal message type for the game actor
-type internal GameMessage =
-    | MakeMove of Move
-    | Dispose
+type GameMessage = MakeMove of Move
 
 [<Literal>]
 let MaxMoves = 9
 
 /// Game actor implementation using bounded channels
-type internal GameActor(inboxCapacity: int) =
-    let inbox = Channel.CreateBounded<GameMessage>(inboxCapacity)
-    let outbox = Channel.CreateBounded<MoveResult>(MaxMoves)
+type GameActor() =
+    let inbox =
+        Channel.CreateBounded<GameMessage>(BoundedChannelOptions(MaxMoves, SingleWriter = false, SingleReader = true))
+
+    let outbox = new ReplaySubject<MoveResult>(1)
+
     let mutable disposed = false
 
     let rec messageLoop state () : Task =
@@ -224,31 +36,22 @@ type internal GameActor(inboxCapacity: int) =
 
                     match message with
                     | MakeMove(move) ->
-                        let newState = makeMove (state, move)
+                        let nextState = makeMove (state, move)
+                        outbox.OnNext(nextState)
 
-                        // Write result to channel
-                        do! outbox.Writer.WriteAsync(newState)
-
-                        // Check if game should end
-                        match newState with
+                        match nextState with
                         | Won _
-                        | Draw _ ->
-                            outbox.Writer.Complete()
-                            disposed <- true
-                        | _ -> return! messageLoop newState ()
-
-                    | Dispose ->
-                        outbox.Writer.Complete()
-                        disposed <- true
+                        | Draw _ -> outbox.OnCompleted()
+                        | _ -> return! messageLoop nextState ()
             with ex ->
-                outbox.Writer.Complete(ex)
+                outbox.OnError(ex)
                 disposed <- true
         }
 
     do
         let initialState = startGame ()
         // Send initial state to channel
-        outbox.Writer.TryWrite(initialState) |> ignore
+        outbox.OnNext(initialState)
         // Start message processing loop
         Task.Run(messageLoop initialState) |> ignore
 
@@ -268,11 +71,16 @@ type internal GameActor(inboxCapacity: int) =
                         )
                     )
 
-        member _.GetResultsAsync() : Collections.Generic.IAsyncEnumerable<MoveResult> = outbox.Reader.ReadAllAsync()
+        member _.Subscribe(observer) = outbox.Subscribe(observer)
 
         member _.Dispose() =
             if not disposed then
-                inbox.Writer.TryWrite(Dispose) |> ignore
                 inbox.Writer.Complete()
 
-let createGame () : Game = new GameActor(3) :> Game
+                if not outbox.IsDisposed then
+                    outbox.OnCompleted()
+                    outbox.Dispose()
+
+                disposed <- true
+
+let createGame () : Game = new GameActor() :> Game

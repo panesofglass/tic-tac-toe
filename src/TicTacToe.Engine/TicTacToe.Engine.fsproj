@@ -6,12 +6,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Model.fsi" />
+    <Compile Include="Model.fs" />
     <Compile Include="Engine.fsi" />
     <Compile Include="Engine.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="9.0.303" />
+    <PackageReference Include="System.Reactive" Version="6.0.2" />
     <PackageReference Include="System.Threading.Channels" Version="9.0.9" />
   </ItemGroup>
 

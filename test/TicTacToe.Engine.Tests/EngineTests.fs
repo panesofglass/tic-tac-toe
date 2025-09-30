@@ -5,40 +5,35 @@ open TicTacToe.Engine
 open TicTacToe.Model
 open TicTacToe.Engine.Tests.TestHelpers
 open System.Threading
-open System.Threading.Tasks
+open System
 
-// Simple helper that collects a specific number of results using IObservable
+// Simple helper that collects a specific number of results using IAsyncEnumerable
 let collectResults (game: Game) (count: int) (timeoutMs: int) =
     task {
         let results = ResizeArray<MoveResult>()
-        let tcs = TaskCompletionSource<MoveResult[]>()
-        let mutable subscription: System.IDisposable option = None
-
-        let observer =
-            { new System.IObserver<MoveResult> with
-                member _.OnNext(result) =
-                    results.Add(result)
-
-                    if results.Count >= count then
-                        tcs.TrySetResult(results.ToArray()) |> ignore
-                        subscription |> Option.iter (fun s -> s.Dispose())
-
-                member _.OnError(error) = tcs.TrySetException(error) |> ignore
-
-                member _.OnCompleted() =
-                    tcs.TrySetResult(results.ToArray()) |> ignore }
-
-        subscription <- Some(game.Subscribe(observer))
-
-        // Set up timeout
         use cts = new CancellationTokenSource(timeoutMs)
 
-        cts.Token.Register(fun () ->
-            tcs.TrySetResult(results.ToArray()) |> ignore
-            subscription |> Option.iter (fun s -> s.Dispose()))
-        |> ignore
+        try
+            let mutable collected = 0
+            let asyncEnum = game.GetResultsAsync(cts.Token)
+            let enumerator = asyncEnum.GetAsyncEnumerator(cts.Token)
 
-        return! tcs.Task
+            try
+                while collected < count do
+                    let! hasNext = enumerator.MoveNextAsync()
+
+                    if hasNext then
+                        results.Add(enumerator.Current)
+                        collected <- collected + 1
+                    else
+                        collected <- count // Exit loop when stream completes
+            finally
+                enumerator.DisposeAsync() |> ignore
+
+        with :? OperationCanceledException ->
+            () // Timeout - return what we collected
+
+        return results.ToArray()
     }
 
 // Apply moves and collect results
@@ -62,8 +57,8 @@ let gameInitializationTests =
         "Game Actor Initialization Tests"
         [ testCaseAsync "Game actor starts with X's turn"
           <| async {
-              let! results = collectResults (createGame()) 1 1000 |> Async.AwaitTask
-              
+              let! results = collectResults (createGame ()) 1 1000 |> Async.AwaitTask
+
               Expect.equal results.Length 1 "Should have initial state"
               let initialState = results.[0]
               Expect.isTrue (isXTurn initialState) "Initial game state should be X's turn"
@@ -71,10 +66,10 @@ let gameInitializationTests =
 
           testCaseAsync "All squares are empty in initial game state"
           <| async {
-              let! results = collectResults (createGame()) 1 1000 |> Async.AwaitTask
-              
+              let! results = collectResults (createGame ()) 1 1000 |> Async.AwaitTask
+
               let gameState = getGameState results.[0]
-              
+
               // Check all positions are empty
               expectEmptySquare gameState TopLeft
               expectEmptySquare gameState TopCenter
@@ -89,22 +84,28 @@ let gameInitializationTests =
 
           testCaseAsync "All valid moves are available at the start"
           <| async {
-              let! results = collectResults (createGame()) 1 1000 |> Async.AwaitTask
-              
+              let! results = collectResults (createGame ()) 1 1000 |> Async.AwaitTask
+
               let initialState = results.[0]
               let validMoves = getValidXMoves initialState
-              
+
               Expect.equal validMoves.Length 9 "Should have 9 valid moves at start"
-              
+
               // Check that all positions are available
               let positions = validMoves |> Array.map (fun (XPos pos) -> pos) |> Set.ofArray
-              
+
               let expectedPositions =
-                  [ TopLeft; TopCenter; TopRight
-                    MiddleLeft; MiddleCenter; MiddleRight
-                    BottomLeft; BottomCenter; BottomRight ]
+                  [ TopLeft
+                    TopCenter
+                    TopRight
+                    MiddleLeft
+                    MiddleCenter
+                    MiddleRight
+                    BottomLeft
+                    BottomCenter
+                    BottomRight ]
                   |> Set.ofList
-              
+
               Expect.equal positions expectedPositions "All board positions should be valid moves"
           } ]
 
@@ -116,27 +117,27 @@ let moveMechanicsTests =
           <| async {
               let moves = [ XMove TopLeft; OMove TopRight ]
               let! results = applyMovesAndCollect moves 3 |> Async.AwaitTask // initial + 2 moves
-              
+
               Expect.equal results.Length 3 "Should have initial state + 2 moves"
-              
+
               let afterXMove = results.[1]
               expectNoError afterXMove "X's move should succeed"
-              
+
               // Check O's valid moves
               let validOMoves = getValidOMoves afterXMove
               Expect.equal validOMoves.Length 8 "Should have 8 valid moves after X plays"
-              
+
               // Check that TopLeft is no longer a valid move
               let oPositions = validOMoves |> Array.map (fun (OPos pos) -> pos) |> Set.ofArray
               Expect.isFalse (oPositions.Contains TopLeft) "TopLeft should no longer be a valid move"
-              
+
               let afterOMove = results.[2]
               expectNoError afterOMove "O's move should succeed"
-              
+
               // Check X's valid moves
               let validXMoves = getValidXMoves afterOMove
               Expect.equal validXMoves.Length 7 "Should have 7 valid moves after O plays"
-              
+
               // Check that both played positions are no longer valid moves
               let xPositions = validXMoves |> Array.map (fun (XPos pos) -> pos) |> Set.ofArray
               Expect.isFalse (xPositions.Contains TopLeft) "TopLeft should no longer be a valid move"
@@ -150,42 +151,42 @@ let winConditionTests =
         [ testCaseAsync "X wins with top row through actor"
           <| async {
               let moves =
-                  [ XMove TopLeft    // X
-                    OMove MiddleLeft // O  
-                    XMove TopCenter  // X
+                  [ XMove TopLeft // X
+                    OMove MiddleLeft // O
+                    XMove TopCenter // X
                     OMove MiddleCenter // O
                     XMove TopRight ] // X wins
-              
+
               // Expect: initial + 5 moves = 6 results
               let! results = applyMovesAndCollect moves 6 |> Async.AwaitTask
-              
+
               Expect.isGreaterThanOrEqual results.Length 6 "Should have all move results"
               let finalResult = results.[results.Length - 1]
-              
+
               Expect.isTrue (isWon finalResult X) "X should win with top row"
-              
+
               let gameState = getGameState finalResult
               expectTakenByX gameState TopLeft
-              expectTakenByX gameState TopCenter  
+              expectTakenByX gameState TopCenter
               expectTakenByX gameState TopRight
           }
 
           testCaseAsync "O wins with middle row through actor"
           <| async {
               let moves =
-                  [ XMove TopLeft    // X
+                  [ XMove TopLeft // X
                     OMove MiddleLeft // O
-                    XMove TopCenter  // X
+                    XMove TopCenter // X
                     OMove MiddleCenter // O
                     XMove BottomRight // X
                     OMove MiddleRight ] // O wins
-              
+
               let! results = applyMovesAndCollect moves 7 |> Async.AwaitTask
               let finalResult = results.[results.Length - 1]
-              
+
               expectNoError finalResult "Applying moves should succeed"
               Expect.isTrue (isWon finalResult O) "O should win with middle row"
-              
+
               let gameState = getGameState finalResult
               expectTakenByO gameState MiddleLeft
               expectTakenByO gameState MiddleCenter
@@ -195,18 +196,18 @@ let winConditionTests =
           testCaseAsync "X wins with left column through actor"
           <| async {
               let moves =
-                  [ XMove TopLeft    // X
-                    OMove TopCenter  // O
+                  [ XMove TopLeft // X
+                    OMove TopCenter // O
                     XMove MiddleLeft // X
                     OMove MiddleCenter // O
                     XMove BottomLeft ] // X wins
-              
+
               let! results = applyMovesAndCollect moves 6 |> Async.AwaitTask
               let finalResult = results.[results.Length - 1]
-              
+
               expectNoError finalResult "Applying moves should succeed"
               Expect.isTrue (isWon finalResult X) "X should win with left column"
-              
+
               let gameState = getGameState finalResult
               expectTakenByX gameState TopLeft
               expectTakenByX gameState MiddleLeft
@@ -216,19 +217,19 @@ let winConditionTests =
           testCaseAsync "O wins with diagonal through actor"
           <| async {
               let moves =
-                  [ XMove TopCenter  // X
-                    OMove TopLeft    // O
+                  [ XMove TopCenter // X
+                    OMove TopLeft // O
                     XMove MiddleLeft // X
                     OMove MiddleCenter // O
                     XMove BottomLeft // X
                     OMove BottomRight ] // O wins
-              
+
               let! results = applyMovesAndCollect moves 7 |> Async.AwaitTask
               let finalResult = results.[results.Length - 1]
-              
+
               expectNoError finalResult "Applying moves should succeed"
               Expect.isTrue (isWon finalResult O) "O should win with diagonal"
-              
+
               let gameState = getGameState finalResult
               expectTakenByO gameState TopLeft
               expectTakenByO gameState MiddleCenter
@@ -243,22 +244,22 @@ let drawConditionTests =
           <| async {
               // This sequence creates a full board with no winner
               let moves =
-                  [ XMove TopLeft     // X | O | X    First row
-                    OMove TopCenter   // X | X | O    Second row
-                    XMove MiddleLeft  // O | X | O    Third row - no winning lines
+                  [ XMove TopLeft // X | O | X    First row
+                    OMove TopCenter // X | X | O    Second row
+                    XMove MiddleLeft // O | X | O    Third row - no winning lines
                     OMove MiddleRight
                     XMove TopRight
                     OMove BottomLeft
                     XMove BottomCenter
                     OMove BottomRight
                     XMove MiddleCenter ] // Final move, fills board with no winner
-              
+
               let! results = applyMovesAndCollect moves 10 |> Async.AwaitTask // initial + 9 moves
               let finalResult = results.[results.Length - 1]
-              
+
               expectNoError finalResult "Applying moves should succeed"
               Expect.isTrue (isDraw finalResult) "Game should end in a draw"
-              
+
               // Verify board is full
               let gameState = getGameState finalResult
               expectTakenByX gameState TopLeft
@@ -280,20 +281,20 @@ let invalidMoveTests =
           <| async {
               let moves = [ XMove TopLeft; OMove TopLeft ] // O tries to move in same square
               let! results = applyMovesAndCollect moves 3 |> Async.AwaitTask
-              
+
               Expect.isGreaterThanOrEqual results.Length 2 "Should have initial + X move + error"
-              
+
               let afterXMove = results.[1]
               expectNoError afterXMove "X's move should succeed"
-              
+
               // Look for error result
               let errorResult = results |> Array.tryFind isError
               Expect.isSome errorResult "Should contain error result"
-              
+
               match errorResult with
               | Some err -> expectError err "Invalid move" "Should get invalid move error"
               | None -> failwith "Expected error result"
-              
+
               let gameState = getGameState afterXMove
               expectTakenByX gameState TopLeft
           }
@@ -302,10 +303,10 @@ let invalidMoveTests =
           <| async {
               let moves = [ OMove TopLeft ] // O tries to move first (should be X)
               let! results = applyMovesAndCollect moves 2 |> Async.AwaitTask
-              
+
               let errorResult = results |> Array.tryFind isError
               Expect.isSome errorResult "Should contain error result for wrong turn"
-              
+
               match errorResult with
               | Some err -> expectError err "Invalid move" "Should get invalid move error"
               | None -> failwith "Expected error result"
@@ -320,4 +321,3 @@ let tests =
           winConditionTests
           drawConditionTests
           invalidMoveTests ]
-

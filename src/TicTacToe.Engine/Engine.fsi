@@ -4,10 +4,13 @@ module TicTacToe.Engine
 /// Implements the actor pattern for handling moves asynchronously
 type Game =
     inherit System.IDisposable
-    inherit System.IObservable<Model.MoveResult>
 
     /// Make a move in the game
     abstract MakeMove: Model.Move -> unit
+
+    /// Stream all game state changes as an async enumerable
+    abstract GetResultsAsync:
+        System.Threading.CancellationToken -> System.Collections.Generic.IAsyncEnumerable<Model.MoveResult>
 
 /// Create a new game instance
 /// Game automatically starts when created

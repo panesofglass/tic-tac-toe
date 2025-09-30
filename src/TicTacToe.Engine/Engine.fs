@@ -1,15 +1,15 @@
 module TicTacToe.Engine
 
 open System
-open System.Reactive.Subjects
 open System.Threading.Channels
 open System.Threading.Tasks
+open System.Threading
 open TicTacToe.Model
 
 type Game =
     inherit IDisposable
-    inherit IObservable<MoveResult>
     abstract MakeMove: Move -> unit
+    abstract GetResultsAsync: CancellationToken -> Collections.Generic.IAsyncEnumerable<MoveResult>
 
 /// Internal message type for the game actor
 type GameMessage = MakeMove of Move
@@ -22,7 +22,7 @@ type GameActor() =
     let inbox =
         Channel.CreateBounded<GameMessage>(BoundedChannelOptions(MaxMoves, SingleWriter = false, SingleReader = true))
 
-    let outbox = new ReplaySubject<MoveResult>(1)
+    let outbox = Channel.CreateBounded<MoveResult>(MaxMoves + 1) // +1 for initial state
 
     let mutable disposed = false
 
@@ -37,21 +37,23 @@ type GameActor() =
                     match message with
                     | MakeMove(move) ->
                         let nextState = makeMove (state, move)
-                        outbox.OnNext(nextState)
+                        do! outbox.Writer.WriteAsync(nextState)
 
                         match nextState with
                         | Won _
-                        | Draw _ -> outbox.OnCompleted()
+                        | Draw _ ->
+                            outbox.Writer.Complete()
+                            disposed <- true
                         | _ -> return! messageLoop nextState ()
             with ex ->
-                outbox.OnError(ex)
+                outbox.Writer.Complete(ex)
                 disposed <- true
         }
 
     do
         let initialState = startGame ()
         // Send initial state to channel
-        outbox.OnNext(initialState)
+        outbox.Writer.TryWrite(initialState) |> ignore
         // Start message processing loop
         Task.Run(messageLoop initialState) |> ignore
 
@@ -71,16 +73,13 @@ type GameActor() =
                         )
                     )
 
-        member _.Subscribe(observer) = outbox.Subscribe(observer)
+        member _.GetResultsAsync(cancellationToken: CancellationToken) =
+            outbox.Reader.ReadAllAsync(cancellationToken)
 
         member _.Dispose() =
             if not disposed then
                 inbox.Writer.Complete()
-
-                if not outbox.IsDisposed then
-                    outbox.OnCompleted()
-                    outbox.Dispose()
-
+                outbox.Writer.Complete()
                 disposed <- true
 
 let createGame () : Game = new GameActor() :> Game

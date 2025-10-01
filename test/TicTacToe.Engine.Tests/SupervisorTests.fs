@@ -44,10 +44,6 @@ let supervisorTests =
                   game.MakeMove(OMove TopRight)
                   game.MakeMove(XMove BottomLeft) // X wins
 
-                  // The test passes if the game doesn't hang
-                  // This suggests the issue is with channel completion
-                  do! Async.Sleep(100)
-
               finally
                   supervisor.Dispose()
           }
@@ -67,8 +63,8 @@ let supervisorTests =
                   game.MakeMove(OMove TopRight)
                   game.MakeMove(XMove BottomLeft) // X wins
 
-                  // Wait longer for supervisor to detect completion via Completion task
-                  do! Async.Sleep(2000)
+                  // Allow a brief moment for async cleanup to complete
+                  do! Async.Sleep(10)
 
                   // Game should be cleaned up
                   Expect.equal (supervisor.GetActiveGameCount()) 0 "Game should be cleaned up"

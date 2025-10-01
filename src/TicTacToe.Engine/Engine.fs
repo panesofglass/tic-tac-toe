@@ -82,100 +82,123 @@ type GameSupervisor =
     abstract GetGame: gameId: string -> Game option
     abstract GetActiveGameCount: unit -> int
 
+type GameRef =
+    { Game: Game
+      Subscription: IDisposable
+      Timestamp: DateTimeOffset }
+
+type GameSupervisorMessage =
+    | CountActive of AsyncReplyChannel<int>
+    | CreateGame of AsyncReplyChannel<string * Game>
+    | GetGame of string * AsyncReplyChannel<Game option>
+    | RemoveGame of string
+    | Timeout
+    | Dispose
+
 type GameSupervisorImpl() as this =
-    let activeGames = Collections.Concurrent.ConcurrentDictionary<string, Game>()
-
-    let gameCreationTimes =
-        Collections.Concurrent.ConcurrentDictionary<string, DateTime>()
-
-    // Track game subscriptions to prevent leaks
-    let gameSubscriptions =
-        Collections.Concurrent.ConcurrentDictionary<string, IDisposable>()
+    let mutable disposed = false
 
     let cleanupTimer =
         new Timer((fun _ -> this.CleanupExpiredGames()), null, TimeSpan.FromMinutes(5.0), TimeSpan.FromMinutes(5.0))
 
-    member private this.MonitorGameCompletion(gameId: string, game: Game) =
-        let subscription =
-            game.Subscribe(
-                { new IObserver<MoveResult> with
-                    member _.OnNext(_) = () // Don't care about intermediate states
-                    member _.OnCompleted() = this.RemoveGame(gameId) // Game completed - clean up
-                    member _.OnError(_) = this.RemoveGame(gameId) } // Game errored - clean up
-            )
+    let agent =
+        MailboxProcessor<GameSupervisorMessage>.Start(fun inbox ->
+            let rec messageLoop state =
+                async {
+                    let! message = inbox.Receive()
 
-        gameSubscriptions.TryAdd(gameId, subscription) |> ignore
+                    match message with
+                    | CountActive reply ->
+                        reply.Reply(Map.count state)
+                        return! messageLoop state
 
-    member private this.RemoveGame(gameId: string) =
-        match activeGames.TryRemove(gameId) with
-        | true, game ->
-            gameCreationTimes.TryRemove(gameId) |> ignore
+                    | CreateGame reply ->
+                        let gameId = Guid.NewGuid().ToString()
+                        let game = createGame ()
+                        let timestamp = DateTimeOffset.UtcNow
 
-            // Dispose subscription first to stop callbacks
-            match gameSubscriptions.TryRemove(gameId) with
-            | true, subscription -> subscription.Dispose()
-            | false, _ -> ()
+                        let subscription =
+                            game.Subscribe(
+                                { new IObserver<MoveResult> with
+                                    member _.OnNext(_) = ()
+                                    member _.OnCompleted() = this.RemoveGame(gameId)
+                                    member _.OnError(_) = this.RemoveGame(gameId) }
+                            )
 
-            try
-                game.Dispose()
-            with _ ->
-                ()
-        | false, _ -> ()
+                        let gameRef =
+                            { Game = game
+                              Timestamp = timestamp
+                              Subscription = subscription }
 
-    member private this.CleanupExpiredGames() =
-        let cutoff = DateTime.UtcNow.AddHours(-1.0)
+                        let nextState = state |> Map.add gameId gameRef
 
-        let expiredGames =
-            gameCreationTimes.ToArray()
-            |> Array.filter (fun kvp -> kvp.Value < cutoff)
-            |> Array.map (_.Key)
+                        reply.Reply((gameId, game))
 
-        for gameId in expiredGames do
-            this.RemoveGame(gameId)
+                        return! messageLoop nextState
+
+                    | GetGame(gameId, reply) ->
+                        match state |> Map.tryFind gameId with
+                        | Some { Game = game } -> reply.Reply(Some game)
+                        | None -> reply.Reply(None)
+
+                        return! messageLoop state
+
+                    | RemoveGame gameId ->
+                        match Map.tryFind gameId state with
+                        | Some gameRef ->
+                            let nextState = state |> Map.remove gameId
+
+                            try
+                                gameRef.Subscription.Dispose()
+                                gameRef.Game.Dispose()
+                            with _ ->
+                                ()
+
+                            return! messageLoop nextState
+                        | None -> return! messageLoop state
+
+                    | Timeout ->
+                        let cutoff = DateTimeOffset.UtcNow.AddHours(-1.0)
+
+                        let removeGames, nextState =
+                            state |> Map.partition (fun _ gameRef -> gameRef.Timestamp < cutoff)
+
+                        for KeyValue(gameId, gameRef) in removeGames do
+                            try
+                                gameRef.Subscription.Dispose()
+                                gameRef.Game.Dispose()
+                            with _ ->
+                                ()
+
+                        return! messageLoop nextState
+
+                    | Dispose ->
+                        for KeyValue(_, gameRef) in state do
+                            try
+                                gameRef.Subscription.Dispose()
+                                gameRef.Game.Dispose()
+                            with _ ->
+                                ()
+                }
+
+            messageLoop (Map<string, GameRef> Seq.empty))
+
+    member private _.RemoveGame(gameId: string) = agent.Post(RemoveGame(gameId))
+
+    member private _.CleanupExpiredGames() = agent.Post(Timeout)
 
     interface GameSupervisor with
-        member this.CreateGame() =
-            let gameId = Guid.NewGuid().ToString()
-            let game = createGame ()
-
-            activeGames.TryAdd(gameId, game) |> ignore
-            gameCreationTimes.TryAdd(gameId, DateTime.UtcNow) |> ignore
-
-            this.MonitorGameCompletion(gameId, game)
-
-            (gameId, game)
+        member _.CreateGame() = agent.PostAndReply(CreateGame)
 
         member _.GetGame(gameId: string) =
-            activeGames.TryGetValue(gameId)
-            |> function
-                | true, game -> Some game
-                | false, _ -> None
+            agent.PostAndReply(fun reply -> GetGame(gameId, reply))
 
-        member _.GetActiveGameCount() = activeGames.Count
+        member _.GetActiveGameCount() = agent.PostAndReply(CountActive)
 
         member _.Dispose() =
-            cleanupTimer.Dispose()
-
-            // Dispose subscriptions first to stop callbacks
-            for kvp in gameSubscriptions.ToArray() do
-                try
-                    kvp.Value.Dispose()
-                with _ ->
-                    ()
-
-            gameSubscriptions.Clear()
-
-            // Clear the dictionaries first to prevent completion handlers from interfering
-            let gamesToDispose = activeGames.ToArray()
-            activeGames.Clear()
-            gameCreationTimes.Clear()
-
-            // Now dispose the games
-            for kvp in gamesToDispose do
-                try
-                    kvp.Value.Dispose()
-                with _ ->
-                    ()
+            if not disposed then
+                cleanupTimer.Dispose()
+                agent.Post(Dispose)
 
 let createGameSupervisor () : GameSupervisor =
     new GameSupervisorImpl() :> GameSupervisor

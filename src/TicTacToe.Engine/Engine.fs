@@ -2,8 +2,6 @@ module TicTacToe.Engine
 
 open System
 open System.Reactive.Subjects
-open System.Threading.Channels
-open System.Threading.Tasks
 open System.Threading
 open TicTacToe.Model
 
@@ -13,51 +11,47 @@ type Game =
     abstract MakeMove: Move -> unit
 
 /// Internal message type for the game actor
-type GameMessage = MakeMove of Move
+type GameMessage =
+    | MakeMove of Move
+    | Stop
 
-[<Literal>]
-let MaxMoves = 9
-
-/// Game actor implementation using BehaviorSubject for broadcast semantics
+/// Game actor implementation using MailboxProcessor and BehaviorSubject for broadcast semantics
 type GameImpl() =
-    let inbox =
-        Channel.CreateBounded<GameMessage>(BoundedChannelOptions(MaxMoves, SingleWriter = false, SingleReader = true))
-
     let initialState = startGame ()
     let outbox = new BehaviorSubject<MoveResult>(initialState)
 
     let mutable disposed = false
 
-    let rec messageLoop state : Task =
-        task {
-            try
-                let! hasMessage = inbox.Reader.WaitToReadAsync()
+    let agent =
+        MailboxProcessor<GameMessage>.Start(fun inbox ->
+            let rec messageLoop state =
+                async {
+                    try
+                        let! message = inbox.Receive()
 
-                if hasMessage && not disposed then
-                    let! message = inbox.Reader.ReadAsync()
+                        match message with
+                        | Stop ->
+                            // Stop the message loop - don't process any more messages
+                            ()
+                        | MakeMove(move) ->
+                            let nextState = makeMove (state, move)
+                            outbox.OnNext(nextState)
 
-                    match message with
-                    | MakeMove(move) ->
-                        let nextState = makeMove (state, move)
-                        outbox.OnNext(nextState)
+                            match nextState with
+                            | Won _
+                            | Draw _ ->
+                                // Game completed - signal completion
+                                outbox.OnCompleted()
+                            | Error _ ->
+                                // Game had error - signal completion
+                                outbox.OnCompleted()
+                            | _ -> return! messageLoop nextState
+                    with ex ->
+                        // Game errored - signal error
+                        outbox.OnError(ex)
+                }
 
-                        match nextState with
-                        | Won _
-                        | Draw _ ->
-                            // Game completed - signal completion
-                            outbox.OnCompleted()
-                        | Error _ ->
-                            // Game had error - signal completion
-                            outbox.OnCompleted()
-                        | _ -> return! messageLoop nextState
-            with ex ->
-                // Game errored - signal error
-                outbox.OnError(ex)
-        }
-
-    do
-        // Start message processing loop
-        messageLoop (initialState) |> ignore
+            messageLoop initialState)
 
     interface Game with
         member _.MakeMove(move: Move) =
@@ -65,22 +59,16 @@ type GameImpl() =
                 raise (ObjectDisposedException("Game"))
             else
                 let message = MakeMove(move)
-
-                if inbox.Writer.TryWrite(message) then
-                    ()
-                else
-                    raise (
-                        InvalidOperationException(
-                            "Game message queue is full. Please wait and try again in a few moments."
-                        )
-                    )
+                agent.Post(message)
 
         member _.Subscribe(observer) = outbox.Subscribe(observer)
 
         member _.Dispose() =
             if not disposed then
                 disposed <- true
-                inbox.Writer.Complete()
+
+                // Send stop message to gracefully stop the message loop
+                agent.Post(Stop)
 
                 if not outbox.IsDisposed then
                     outbox.OnCompleted()

@@ -1,6 +1,6 @@
 module TicTacToe.Engine
 
-/// A game actor that manages a single game instance using bounded channels
+/// A game actor that manages a single game instance using MailboxProcessor
 /// Implements the actor pattern for handling moves asynchronously
 type Game =
     inherit System.IDisposable

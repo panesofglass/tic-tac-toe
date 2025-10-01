@@ -5,41 +5,47 @@ open TicTacToe.Engine
 open TicTacToe.Model
 open TicTacToe.Engine.Tests.TestHelpers
 open System.Threading
-open System
+open System.Threading.Tasks
 
-// Simple helper that collects a specific number of results using IAsyncEnumerable
+// Simple helper that collects a specific number of results using IObservable
 let collectResults (game: Game) (count: int) (timeoutMs: int) =
     task {
         let results = ResizeArray<MoveResult>()
+        let tcs = TaskCompletionSource<MoveResult[]>()
+        let mutable subscription: System.IDisposable option = None
+
+        let observer =
+            { new System.IObserver<MoveResult> with
+                member _.OnNext(result) =
+                    results.Add(result)
+
+                    if results.Count >= count then
+                        tcs.TrySetResult(results.ToArray()) |> ignore
+                        subscription |> Option.iter (fun s -> s.Dispose())
+
+                member _.OnError(error) = tcs.TrySetException(error) |> ignore
+
+                member _.OnCompleted() =
+                    tcs.TrySetResult(results.ToArray()) |> ignore }
+
+        subscription <- Some(game.Subscribe(observer))
+
+        // Set up timeout
         use cts = new CancellationTokenSource(timeoutMs)
 
-        try
-            let mutable collected = 0
-            let asyncEnum = game.GetResultsAsync(cts.Token)
-            let enumerator = asyncEnum.GetAsyncEnumerator(cts.Token)
+        cts.Token.Register(fun () ->
+            tcs.TrySetResult(results.ToArray()) |> ignore
+            subscription |> Option.iter (fun s -> s.Dispose()))
+        |> ignore
 
-            try
-                while collected < count do
-                    let! hasNext = enumerator.MoveNextAsync()
-
-                    if hasNext then
-                        results.Add(enumerator.Current)
-                        collected <- collected + 1
-                    else
-                        collected <- count // Exit loop when stream completes
-            finally
-                enumerator.DisposeAsync() |> ignore
-
-        with :? OperationCanceledException ->
-            () // Timeout - return what we collected
-
-        return results.ToArray()
+        return! tcs.Task
     }
 
 // Apply moves and collect results
 let applyMovesAndCollect (moves: Move list) (expectedResults: int) =
     task {
-        use game = createGame ()
+        let supervisor = createGameSupervisor ()
+        let (_, game) = supervisor.CreateGame()
 
         // Start collecting results
         let resultsTask = collectResults game expectedResults 5000
@@ -48,7 +54,9 @@ let applyMovesAndCollect (moves: Move list) (expectedResults: int) =
         for move in moves do
             game.MakeMove(move)
 
-        return! resultsTask
+        let! result = resultsTask
+        supervisor.Dispose()
+        return result
     }
 
 [<Tests>]
@@ -57,7 +65,10 @@ let gameInitializationTests =
         "Game Actor Initialization Tests"
         [ testCaseAsync "Game actor starts with X's turn"
           <| async {
-              let! results = collectResults (createGame ()) 1 1000 |> Async.AwaitTask
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
+              let! results = collectResults game 1 1000 |> Async.AwaitTask
+              supervisor.Dispose()
 
               Expect.equal results.Length 1 "Should have initial state"
               let initialState = results.[0]
@@ -66,7 +77,10 @@ let gameInitializationTests =
 
           testCaseAsync "All squares are empty in initial game state"
           <| async {
-              let! results = collectResults (createGame ()) 1 1000 |> Async.AwaitTask
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
+              let! results = collectResults game 1 1000 |> Async.AwaitTask
+              supervisor.Dispose()
 
               let gameState = getGameState results.[0]
 
@@ -84,7 +98,10 @@ let gameInitializationTests =
 
           testCaseAsync "All valid moves are available at the start"
           <| async {
-              let! results = collectResults (createGame ()) 1 1000 |> Async.AwaitTask
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
+              let! results = collectResults game 1 1000 |> Async.AwaitTask
+              supervisor.Dispose()
 
               let initialState = results.[0]
               let validMoves = getValidXMoves initialState
@@ -313,6 +330,56 @@ let invalidMoveTests =
           } ]
 
 [<Tests>]
+let observableCompletionTests =
+    testList
+        "Game Observable Completion Tests"
+        [ testCaseAsync "Observable completes when game ends in victory"
+          <| async {
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
+
+              try
+                  let completionTcs = TaskCompletionSource<bool>()
+                  let mutable subscription: System.IDisposable option = None
+
+                  let observer =
+                      { new System.IObserver<MoveResult> with
+                          member _.OnNext(_) = ()
+
+                          member _.OnError(error) =
+                              completionTcs.TrySetException(error) |> ignore
+
+                          member _.OnCompleted() =
+                              completionTcs.TrySetResult(true) |> ignore }
+
+                  subscription <- Some(game.Subscribe(observer))
+
+                  // Play to victory
+                  game.MakeMove(XMove TopLeft)
+                  game.MakeMove(OMove TopCenter)
+                  game.MakeMove(XMove MiddleLeft)
+                  game.MakeMove(OMove TopRight)
+                  game.MakeMove(XMove BottomLeft) // X wins
+
+                  // Wait for completion with timeout
+                  let! completionResult = Async.StartChild(Async.AwaitTask(completionTcs.Task), 2000) |> Async.Catch
+
+                  match completionResult with
+                  | Choice1Of2 _ -> () // Success - observable completed
+                  | Choice2Of2 ex ->
+                      match ex with
+                      | :? System.TimeoutException ->
+                          failwith
+                              "Observable did not complete within timeout - this indicates the completion signal is not working"
+                      | _ -> raise ex
+
+                  subscription |> Option.iter (fun s -> s.Dispose())
+
+              finally
+                  supervisor.Dispose()
+          } ]
+
+[<Tests>]
 let tests =
     testList
         "TicTacToe Engine Actor Tests"
@@ -320,4 +387,5 @@ let tests =
           moveMechanicsTests
           winConditionTests
           drawConditionTests
-          invalidMoveTests ]
+          invalidMoveTests
+          observableCompletionTests ]

@@ -10,6 +10,7 @@
     <Compile Include="TestHelpers.fs" />
     <Compile Include="ModelTests.fs" />
     <Compile Include="EngineTests.fs" />
+    <Compile Include="SupervisorTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

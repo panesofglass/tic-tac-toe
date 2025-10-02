@@ -8,12 +8,15 @@
 
   <ItemGroup>
     <Compile Include="Extensions.fs" />
-    <Compile Include="Auth.fs" />
-    <Compile Include="Models.fs" />
     <Compile Include="DatastarHelpers.fs" />
     <Compile Include="DatastarAttrs.fs" />
+    <Compile Include="Auth.fs" />
+    <Compile Include="Models.fs" />
     <Compile Include="templates/shared/layout.fs" />
     <Compile Include="templates/home.fs" />
+    <Compile Include="templates/games.fs" />
+    <Compile Include="templates/game.fs" />
+    <Compile Include="Handlers.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

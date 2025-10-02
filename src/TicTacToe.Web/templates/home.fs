@@ -1,51 +1,133 @@
 module TicTacToe.Web.templates.home
 
 open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.DependencyInjection
 open Oxpecker.ViewEngine
+open TicTacToe.Engine
 
-let msgFragment (message: string) = Fragment() { p (class' = "") { message } }
-
-let html (ctx: HttpContext) =
-    ctx.Items["Title"] <- "Signals"
+let homePage (ctx: HttpContext) =
+    ctx.Items["Title"] <- "Tic Tac Toe - Home"
+    let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+    let gameCount = supervisor.GetActiveGameCount()
 
     Fragment() {
-        div (class' = "p-2") {
-            div (class' = "mb-10") {
-                h1 (class' = "text-5xl font-bold font-heading mb-6 max-w-2xl") { @"Datastar SDK Demo" }
+        div (class' = "home-container") {
+            h1 (class' = "home-title") { "Tic Tac Toe" }
 
-                p (class' = "text-lg mb-2 max-w-xl") {
-                    @"SSE events will be streamed from the backend to the frontend."
+            div (class' = "home-content") {
+                div (class' = "stats") {
+                    h2 () { "Active Games" }
+                    div (class' = "game-count") { string gameCount }
                 }
 
-                hr (class' = "border-gray-200")
-            }
+                div (class' = "actions") {
+                    (button (class' = "create-game-btn", type' = "button")).data ("on-click", "@post('/games')") {
+                        "Create New Game"
+                    }
 
-            div(class' = "w-3/4 lg:w-1/2").data ("signals-delay", "400") {
-                div (class' = "w-full gap-10 mb-4") {
-
-                    label (class' = "block text-nowrap text-md mb-2 font-medium", for' = "delay") { @"Delay in ms" }
-
-                    input(
-                        class' =
-                            "w-full rounded-full p-4 outline-none border border-gray-100 shadow placeholder-gray-500 focus:ring focus:ring-orange-200 transition duration-200 mb-4",
-                        id = "delay",
-                        type' = "number",
-                        step = "100",
-                        min = "0"
-                    )
-                        .data ("bind", "delay")
-
+                    a (href = "/games", class' = "view-games-link") { "View All Games" }
                 }
 
-                button(
-                    class' =
-                        "h-14 max-w-32 items-center justify-center py-4 px-6 text-white font-bold font-heading rounded-full bg-orange-500 w-full text-center border border-orange-600 shadow hover:bg-orange-600 focus:ring focus:ring-orange-200 transition duration-200 mb-8"
-                )
-                    .data ("on-click", "@get('/messages')") {
-                    @"Start"
+                div (class' = "info") {
+                    p () { "Create a new game or view existing games to play." }
+                    p (class' = "tech-note") { "Powered by F#, Datastar, and Server-Sent Events" }
                 }
-
-                div (id = "remote-text", class' = "text-center text-lg mb-10")
             }
         }
+    }
+
+let homeStyles =
+    style () {
+        raw
+            """
+        .home-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+
+        .home-title {
+            font-size: 3em;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .home-content {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .stats {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .stats h2 {
+            margin: 0 0 10px 0;
+            color: #555;
+            font-size: 1.2em;
+        }
+
+        .game-count {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .create-game-btn {
+            background-color: #27ae60;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: bold;
+        }
+
+        .create-game-btn:hover {
+            background-color: #229954;
+        }
+
+        .view-games-link {
+            color: #3498db;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 10px 20px;
+            border: 2px solid #3498db;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .view-games-link:hover {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .info {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .info p {
+            margin: 10px 0;
+        }
+
+        .tech-note {
+            font-size: 0.9em;
+            font-style: italic;
+        }
+        """
     }

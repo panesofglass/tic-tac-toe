@@ -15,11 +15,15 @@ type SquarePosition =
     | BottomCenter
     | BottomRight
 
+    static member TryParse: string -> SquarePosition option
+
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
 type Player =
     | X
     | O
+
+    static member TryParse: string -> Player option
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -53,6 +57,8 @@ type MoveResult =
 type Move =
     | XMove of SquarePosition
     | OMove of SquarePosition
+
+    static member TryParse: player: string * position: string -> Move option
 
 type StartGame = unit -> MoveResult
 

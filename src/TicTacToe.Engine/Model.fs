@@ -15,11 +15,47 @@ type SquarePosition =
     | BottomCenter
     | BottomRight
 
+    override this.ToString() =
+        match this with
+        | TopLeft -> "TopLeft"
+        | TopCenter -> "TopCenter"
+        | TopRight -> "TopRight"
+        | MiddleLeft -> "MiddleLeft"
+        | MiddleCenter -> "MiddleCenter"
+        | MiddleRight -> "MiddleRight"
+        | BottomLeft -> "BottomLeft"
+        | BottomCenter -> "BottomCenter"
+        | BottomRight -> "BottomRight"
+
+    static member TryParse(str: string) =
+        match str with
+        | "TopLeft" -> Some TopLeft
+        | "TopCenter" -> Some TopCenter
+        | "TopRight" -> Some TopRight
+        | "MiddleLeft" -> Some MiddleLeft
+        | "MiddleCenter" -> Some MiddleCenter
+        | "MiddleRight" -> Some MiddleRight
+        | "BottomLeft" -> Some BottomLeft
+        | "BottomCenter" -> Some BottomCenter
+        | "BottomRight" -> Some BottomRight
+        | _ -> None
+
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
 type Player =
     | X
     | O
+
+    override this.ToString() =
+        match this with
+        | X -> "X"
+        | O -> "O"
+
+    static member TryParse(str: string) =
+        match str with
+        | "X" -> Some X
+        | "O" -> Some O
+        | _ -> None
 
 [<StructuralEquality; StructuralComparison>]
 [<Struct>]
@@ -53,6 +89,12 @@ type MoveResult =
 type Move =
     | XMove of SquarePosition
     | OMove of SquarePosition
+
+    static member TryParse(player: string, position: string) =
+        match Player.TryParse(player), SquarePosition.TryParse(position) with
+        | Some X, Some pos -> Some(XMove pos)
+        | Some O, Some pos -> Some(OMove pos)
+        | _ -> None
 
 type XMove = MoveResult * XPosition -> MoveResult
 

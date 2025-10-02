@@ -52,12 +52,8 @@ let makeMove gameId : EndpointHandler =
                 match Move.TryParse(player, position) with
                 | None -> ctx.Response.StatusCode <- 400
                 | Some move ->
-                    try
-                        game.MakeMove move
-                        ctx.Response.StatusCode <- 202
-                    with ex ->
-                        ctx.Response.StatusCode <- 409
-                        do! ctx.Response.WriteAsync ex.Message
+                    game.MakeMove move
+                    ctx.Response.StatusCode <- 202
         }
 
 let gamePage gameId : EndpointHandler =

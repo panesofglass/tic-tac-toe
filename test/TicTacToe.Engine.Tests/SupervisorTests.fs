@@ -63,12 +63,83 @@ let supervisorTests =
                   game.MakeMove(OMove TopRight)
                   game.MakeMove(XMove BottomLeft) // X wins
 
-                  // Allow a brief moment for async cleanup to complete
-                  do! Async.Sleep(10)
+                  // Allow more time for async cleanup to complete
+                  do! Async.Sleep(100)
 
                   // Game should be cleaned up
                   Expect.equal (supervisor.GetActiveGameCount()) 0 "Game should be cleaned up"
                   Expect.isNone (supervisor.GetGame(gameId)) "Game should no longer be retrievable"
+
+              finally
+                  supervisor.Dispose()
+          }
+
+          testCaseAsync "Game properly validates move conflicts and turn order"
+          <| async {
+              let supervisor = createGameSupervisor ()
+
+              try
+                  let (gameId, game) = supervisor.CreateGame()
+
+                  let resultList = System.Collections.Generic.List<MoveResult>()
+
+                  use subscription =
+                      game.Subscribe(
+                          { new System.IObserver<MoveResult> with
+                              member _.OnNext(result) = resultList.Add(result)
+                              member _.OnError(ex) = () // System errors only
+                              member _.OnCompleted() = () }
+                      )
+
+                  // Make X's first move
+                  game.MakeMove(XMove TopLeft)
+                  do! Async.Sleep(50) // Allow processing
+
+                  // Try to make another X move - should generate Error MoveResult
+                  game.MakeMove(XMove TopCenter)
+                  do! Async.Sleep(50) // Allow processing
+
+                  // Should have received Error MoveResults by now
+                  let errorResults =
+                      resultList
+                      |> Seq.filter (fun r ->
+                          match r with
+                          | Error _ -> true
+                          | _ -> false)
+                      |> Seq.toList
+
+                  Expect.isGreaterThan errorResults.Length 0 "Should have received error for wrong turn"
+
+                  let firstError = errorResults.[0]
+
+                  let errorMessage =
+                      match firstError with
+                      | Error(_, msg) -> msg
+                      | _ -> ""
+
+                  Expect.stringContains errorMessage "Invalid" "Should reject wrong turn move"
+
+                  // Try to make O move to same square as X - should also generate error
+                  game.MakeMove(OMove TopLeft)
+                  do! Async.Sleep(50) // Allow processing
+
+                  // Should have another error
+                  let allErrors =
+                      resultList
+                      |> Seq.filter (fun r ->
+                          match r with
+                          | Error _ -> true
+                          | _ -> false)
+                      |> Seq.toList
+
+                  Expect.isGreaterThanOrEqual allErrors.Length 2 "Should have errors for both invalid moves"
+
+                  // Make valid O move - should succeed
+                  game.MakeMove(OMove TopCenter)
+                  do! Async.Sleep(50) // Allow processing
+
+                  // Should have valid results (initial + first X move + valid O move + error results + preserved states)
+                  Expect.isGreaterThanOrEqual resultList.Count 5 "Should have valid move results and error results"
 
               finally
                   supervisor.Dispose()

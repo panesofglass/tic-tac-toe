@@ -8,6 +8,10 @@
 
   <ItemGroup>
     <Compile Include="AuthTests.fs" />
+    <Compile Include="PageRenderingTests.fs" />
+    <Compile Include="HandlerTests.fs" />
+    <Compile Include="GameBoardTests.fs" />
+    <Compile Include="MoveInteractionTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

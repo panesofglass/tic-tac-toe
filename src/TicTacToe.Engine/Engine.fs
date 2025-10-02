@@ -30,24 +30,20 @@ type GameImpl() =
                         let! message = inbox.Receive()
 
                         match message with
-                        | Stop ->
-                            // Stop the message loop - don't process any more messages
-                            ()
+                        | Stop -> ()
                         | MakeMove(move) ->
                             let nextState = makeMove (state, move)
                             outbox.OnNext(nextState)
 
                             match nextState with
                             | Won _
-                            | Draw _ ->
-                                // Game completed - signal completion
-                                outbox.OnCompleted()
+                            | Draw _ -> outbox.OnCompleted()
                             | Error _ ->
-                                // Game had error - signal completion
-                                outbox.OnCompleted()
-                            | _ -> return! messageLoop nextState
+                                outbox.OnNext(state)
+                                return! messageLoop state
+                            | XTurn _
+                            | OTurn _ -> return! messageLoop nextState
                     with ex ->
-                        // Game errored - signal error
                         outbox.OnError(ex)
                 }
 
@@ -122,7 +118,7 @@ type GameSupervisorImpl() as this =
                                 { new IObserver<MoveResult> with
                                     member _.OnNext(_) = ()
                                     member _.OnCompleted() = this.RemoveGame(gameId)
-                                    member _.OnError(_) = this.RemoveGame(gameId) }
+                                    member _.OnError(_) = this.RemoveGame(gameId) } // Remove game on system errors
                             )
 
                         let gameRef =

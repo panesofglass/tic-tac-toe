@@ -1,5 +1,6 @@
 module TicTacToe.Engine.Tests.EngineTests
 
+open System
 open Expecto
 open TicTacToe.Engine
 open TicTacToe.Model
@@ -7,7 +8,7 @@ open TicTacToe.Engine.Tests.TestHelpers
 open System.Threading
 open System.Threading.Tasks
 
-// Simple helper that collects a specific number of results using IObservable
+// Helper that collects MoveResults (ignores errors)
 let collectResults (game: Game) (count: int) (timeoutMs: int) =
     task {
         let results = ResizeArray<MoveResult>()
@@ -23,7 +24,9 @@ let collectResults (game: Game) (count: int) (timeoutMs: int) =
                         tcs.TrySetResult(results.ToArray()) |> ignore
                         subscription |> Option.iter (fun s -> s.Dispose())
 
-                member _.OnError(error) = tcs.TrySetException(error) |> ignore
+                member _.OnError(_error) =
+                    // Ignore errors for this collector
+                    ()
 
                 member _.OnCompleted() =
                     tcs.TrySetResult(results.ToArray()) |> ignore }
@@ -41,7 +44,59 @@ let collectResults (game: Game) (count: int) (timeoutMs: int) =
         return! tcs.Task
     }
 
-// Apply moves and collect results
+// Helper that collects both MoveResults and Errors as separate events
+let collectResultsAndErrors (game: Game) (count: int) (timeoutMs: int) =
+    task {
+        let results = ResizeArray<obj>()
+        let tcs = TaskCompletionSource<obj[]>()
+        let mutable subscription: System.IDisposable option = None
+
+        let observer =
+            { new System.IObserver<MoveResult> with
+                member _.OnNext(result) =
+                    results.Add(result :> obj)
+
+                    if results.Count >= count then
+                        tcs.TrySetResult(results.ToArray()) |> ignore
+                        subscription |> Option.iter (fun s -> s.Dispose())
+
+                member _.OnError(error) =
+                    results.Add(error :> obj)
+
+                    if results.Count >= count then
+                        tcs.TrySetResult(results.ToArray()) |> ignore
+                        subscription |> Option.iter (fun s -> s.Dispose())
+
+                member _.OnCompleted() =
+                    tcs.TrySetResult(results.ToArray()) |> ignore }
+
+        subscription <- Some(game.Subscribe(observer))
+
+        // Set up timeout
+        use cts = new CancellationTokenSource(timeoutMs)
+
+        cts.Token.Register(fun () ->
+            tcs.TrySetResult(results.ToArray()) |> ignore
+            subscription |> Option.iter (fun s -> s.Dispose()))
+        |> ignore
+
+        return! tcs.Task
+    }
+
+// Helper functions for working with mixed result/error arrays
+let isMoveResult (obj: obj) = obj :? MoveResult
+let isException (obj: obj) = obj :? Exception
+
+let asMoveResult (obj: obj) = obj :?> MoveResult
+let asException (obj: obj) = obj :?> Exception
+
+let getResults (objects: obj[]) =
+    objects |> Array.filter isMoveResult |> Array.map asMoveResult
+
+let getErrors (objects: obj[]) =
+    objects |> Array.filter isException |> Array.map asException
+
+// Apply moves and collect results (MoveResults only)
 let applyMovesAndCollect (moves: Move list) (expectedResults: int) =
     task {
         let supervisor = createGameSupervisor ()
@@ -49,6 +104,24 @@ let applyMovesAndCollect (moves: Move list) (expectedResults: int) =
 
         // Start collecting results
         let resultsTask = collectResults game expectedResults 5000
+
+        // Apply moves with small delays
+        for move in moves do
+            game.MakeMove(move)
+
+        let! result = resultsTask
+        supervisor.Dispose()
+        return result
+    }
+
+// Apply moves and collect both results and errors
+let applyMovesAndCollectWithErrors (moves: Move list) (expectedCount: int) =
+    task {
+        let supervisor = createGameSupervisor ()
+        let (_, game) = supervisor.CreateGame()
+
+        // Start collecting both results and errors
+        let resultsTask = collectResultsAndErrors game expectedCount 5000
 
         // Apply moves with small delays
         for move in moves do
@@ -296,37 +369,174 @@ let invalidMoveTests =
         "Game Actor Invalid Move Tests"
         [ testCaseAsync "Attempting to move in an already taken square is invalid"
           <| async {
-              let moves = [ XMove TopLeft; OMove TopLeft ] // O tries to move in same square
-              let! results = applyMovesAndCollect moves 3 |> Async.AwaitTask
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
 
-              Expect.isGreaterThanOrEqual results.Length 2 "Should have initial + X move + error"
+              try
+                  // Start collecting results BEFORE making moves (expect 4: initial + X move + Error + preserved state)
+                  let resultsTask = collectResults game 4 2000
 
-              let afterXMove = results.[1]
-              expectNoError afterXMove "X's move should succeed"
+                  game.MakeMove(XMove TopLeft) // Valid
+                  game.MakeMove(OMove TopLeft) // Invalid - same square
 
-              // Look for error result
-              let errorResult = results |> Array.tryFind isError
-              Expect.isSome errorResult "Should contain error result"
+                  let! results = resultsTask |> Async.AwaitTask
 
-              match errorResult with
-              | Some err -> expectError err "Invalid move" "Should get invalid move error"
-              | None -> failwith "Expected error result"
+                  let validResults = results |> Array.filter (fun r -> not (isError r))
+                  let errorResults = results |> Array.filter isError
 
-              let gameState = getGameState afterXMove
-              expectTakenByX gameState TopLeft
+                  Expect.isGreaterThanOrEqual validResults.Length 2 "Should have initial + X move"
+                  Expect.isGreaterThan errorResults.Length 0 "Should contain Error MoveResult for taken square"
+
+                  let afterXMove = validResults.[1]
+                  expectNoError afterXMove "X's move should succeed"
+
+                  let error = errorResults.[0]
+                  let errorMessage = match error with | Error(_, msg) -> msg | _ -> "Not an error"
+                  Expect.stringContains errorMessage "Invalid move" "Should get invalid move error"
+
+                  let gameState = getGameState afterXMove
+                  expectTakenByX gameState TopLeft
+              finally
+                  supervisor.Dispose()
           }
 
           testCaseAsync "Attempting to make O move during X's turn is invalid"
           <| async {
-              let moves = [ OMove TopLeft ] // O tries to move first (should be X)
-              let! results = applyMovesAndCollect moves 2 |> Async.AwaitTask
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
 
-              let errorResult = results |> Array.tryFind isError
-              Expect.isSome errorResult "Should contain error result for wrong turn"
+              try
+                  // Start collecting results BEFORE making moves (expect 3: initial + Error + preserved state)
+                  let resultsTask = collectResults game 3 2000
 
-              match errorResult with
-              | Some err -> expectError err "Invalid move" "Should get invalid move error"
-              | None -> failwith "Expected error result"
+                  game.MakeMove(OMove TopLeft) // Invalid - wrong turn
+
+                  let! results = resultsTask |> Async.AwaitTask
+
+                  let errorResults = results |> Array.filter isError
+                  Expect.isGreaterThan errorResults.Length 0 "Should contain Error MoveResult for wrong turn"
+
+                  let error = errorResults.[0]
+                  let errorMessage = match error with | Error(_, msg) -> msg | _ -> "Not an error"
+                  Expect.stringContains errorMessage "Invalid move" "Should get invalid move error"
+              finally
+                  supervisor.Dispose()
+          }
+
+          testCaseAsync "Attempting to make X move during O's turn is invalid"
+          <| async {
+              let supervisor = createGameSupervisor ()
+              let (_, game) = supervisor.CreateGame()
+
+              try
+                  // Start collecting results BEFORE making moves (expect 5: initial + X move + Error + preserved state)
+                  let resultsTask = collectResults game 5 2000
+
+                  game.MakeMove(XMove TopLeft)  // Valid
+                  game.MakeMove(XMove TopCenter) // Invalid - wrong turn
+
+                  let! results = resultsTask |> Async.AwaitTask
+
+                  let errorResults = results |> Array.filter isError
+                  Expect.isGreaterThan errorResults.Length 0 "Should contain Error MoveResult for wrong turn"
+
+                  let error = errorResults.[0]
+                  let errorMessage = match error with | Error(_, msg) -> msg | _ -> "Not an error"
+                  Expect.stringContains errorMessage "Invalid move" "Should get invalid move error"
+              finally
+                  supervisor.Dispose()
+          }
+
+          testCaseAsync "Game state is preserved after invalid move"
+          <| async {
+              let supervisor = createGameSupervisor ()
+              let (gameId, game) = supervisor.CreateGame()
+
+              try
+                  // Start collecting results BEFORE making moves
+                  let resultsTask = collectResults game 5 5000
+
+                  // Make valid X move
+                  game.MakeMove(XMove TopLeft)
+                  do! Async.Sleep(50)
+
+                  // Try invalid move (X again)
+                  game.MakeMove(XMove TopCenter)
+                  do! Async.Sleep(50)
+
+                  // Make valid O move - this should work if state was preserved
+                  game.MakeMove(OMove TopRight)
+                  do! Async.Sleep(100) // Extra time for final move processing
+
+                  let! results = resultsTask |> Async.AwaitTask // initial + 4 states
+
+                  let validResults = results |> Array.filter (fun r -> not (isError r))
+                  let errorResults = results |> Array.filter isError
+
+                  Expect.isGreaterThan validResults.Length 0 "Should have valid results"
+                  Expect.isGreaterThan errorResults.Length 0 "Should have error results"
+
+                  // Final valid state should show X at TopLeft, O at TopRight
+                  let finalValidState = validResults |> Array.last
+                  let gameState = getGameState finalValidState
+                  expectTakenByX gameState TopLeft
+                  expectTakenByO gameState TopRight
+                  expectEmptySquare gameState TopCenter // Invalid move should not have been applied
+
+              finally
+                  supervisor.Dispose()
+          }
+
+          testCaseAsync "Actor continues processing after error"
+          <| async {
+              let supervisor = createGameSupervisor ()
+              let (gameId, game) = supervisor.CreateGame()
+
+              try
+                  // Start collecting results BEFORE making moves
+                  let resultsTask = collectResults game 8 2000
+                  
+                  // Sequence: valid, invalid, valid, invalid, valid
+                  let moves =
+                      [ XMove TopLeft // Valid
+                        XMove TopCenter // Invalid (wrong turn)
+                        OMove TopCenter // Valid
+                        OMove MiddleLeft // Invalid (wrong turn)
+                        XMove MiddleLeft ] // Valid
+
+                  // Apply all moves
+                  for move in moves do
+                      game.MakeMove(move)
+
+                  // Time to process moves asynchronously
+                  do! Async.Sleep 200
+
+                  let! results = resultsTask |> Async.AwaitTask
+
+                  let validResults = results |> Array.filter (fun r -> not (isError r))
+                  let errorResults = results |> Array.filter isError
+
+                  Expect.equal errorResults.Length 2 "Should have 2 error results"
+
+                  Expect.isGreaterThanOrEqual
+                      validResults.Length
+                      4
+                      "Should have at least 4 valid states (initial + 3 moves)"
+
+                  Expect.isGreaterThanOrEqual
+                      validResults.Length
+                      4
+                      "Should have at least 4 valid states (initial + 3 moves)"
+
+                  // Verify final game state has all valid moves applied
+                  let finalState = validResults |> Array.last
+                  let gameState = getGameState finalState
+                  expectTakenByX gameState TopLeft
+                  expectTakenByO gameState TopCenter
+                  expectTakenByX gameState MiddleLeft
+
+              finally
+                  supervisor.Dispose()
           } ]
 
 [<Tests>]

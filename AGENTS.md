@@ -11,22 +11,17 @@
 - Showcase minimal JavaScript approach with server-side rendering
 - Implement real-time multiplayer gameplay using Server-Sent Events
 
-## Key Stakeholders
-
-- Development team
-- Players of the game
-
 ## Technology Stack
 
 ### Core Frameworks
 
-- **.NET 9.0** - Primary runtime and SDK
+- **.NET 10.0** - Primary runtime and SDK
 - **F#** - Primary programming language
 - **ASP.NET Core** - Web framework
 - **Frank.Builder** - Routing and HTTP handling
 - **Oxpecker** - View rendering
-- **StarFederation.Datastar 1.0.0-beta.4** - .NET SDK for hypermedia applications
-- **datastar.js 1.0.0-beta.10** - Client-side declarative data binding
+- **StarFederation.Datastar 1.2.0** - .NET SDK for hypermedia applications
+- **datastar 1.0.0-RC.7** - Client-side declarative data binding
 
 ### Testing Frameworks
 
@@ -320,4 +315,3 @@ Implements 8 winning combinations:
    - Cookie-based authentication flow
 
 This project demonstrates how hypermedia-driven architecture combined with functional programming can create interactive, real-time web applications with minimal client-side JavaScript complexity.
-

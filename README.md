@@ -12,7 +12,7 @@ A web-based Tic-Tac-Toe game built with F# and ASP.NET Core.
 
 ### Prerequisites
 
-- .NET 9.0 SDK or later
+- .NET 10.0 SDK or later
 - A modern web browser
 
 ### Running the Application
@@ -61,13 +61,13 @@ To access the current user's identification in a request handler:
 let userHandler (ctx: HttpContext) =
     // Get the user ID
     let userId = ctx.User.FindClaimValue(ClaimTypes.UserId)
-    
+
     // Get the created timestamp
     let created = ctx.User.FindClaimValue(ClaimTypes.Created)
-    
+
     // Check if this is a returning user
     let isReturningUser = ctx.User.HasClaim(ClaimTypes.Created)
-    
+
     // Use the TryGetUserId extension method
     match ctx.User.TryGetUserId() with
     | Some id -> // Use the ID
@@ -109,11 +109,13 @@ A tic-tac-toe game implementation using the datastar hypermedia framework, demon
 ## Quick Start
 
 ### Prerequisites
-- .NET 8.0 SDK
+
+- .NET 10.0 SDK
 - A modern web browser
 - Git
 
 ### Setup and Run
+
 `ash
 git clone [repository-url]
 cd tic-tac-toe
@@ -121,38 +123,39 @@ dotnet restore
 dotnet run --project src/TicTacToe.Web
 `
 
-Access the game at http://localhost:5000
+Access the game at <http://localhost:5000>
 
 ## Documentation
 
 This project's documentation is organized into three main sections:
 
 ### 1. Project Documentation
+
 - [Project Overview](docs/project/overview.md)
 - [Requirements](docs/project/requirements.md)
 - [Architecture](docs/project/architecture.md)
 
 ### 2. Development Guide
+
 - [Setup Guide](docs/dev/setup.md)
 - [Development Guidelines](docs/dev/guidelines.md)
 - [Progress Tracker](docs/dev/progress.md)
 
 ### 3. AI Agent Documentation
+
 - [Project Context](docs/agent/context.md)
 - [Task Status](docs/agent/tasks.md)
 - [Decision Log](docs/agent/decisions.md)
 
 ## Project Structure
 
-`
-TicTacToe/
+`TicTacToe/
 ├── docs/                    # Project documentation
 ├── src/
 │   ├── TicTacToe.Engine/   # Core game logic
 │   └── TicTacToe.Web/      # Web application
 └── test/
-    └── TicTacToe.Tests/    # Test suite
-`
+    └── TicTacToe.Tests/    # Test suite`
 
 ## Development Status
 

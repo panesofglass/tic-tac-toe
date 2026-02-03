@@ -93,7 +93,7 @@ The Engine library (`src/TicTacToe.Engine/`) is considered **stable and complete
 
 This section documents the approved technology choices for the project.
 
-**Language**: F# targeting .NET 9.0
+**Language**: F# targeting .NET 10.0
 **Web Framework**: ASP.NET Core with Frank.Builder routing
 **View Rendering**: Oxpecker for HTML generation
 **Hypermedia**: StarFederation.Datastar for server-sent events and data binding

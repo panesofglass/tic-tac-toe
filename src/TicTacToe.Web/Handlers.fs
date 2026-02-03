@@ -1,113 +1,121 @@
 module TicTacToe.Web.Handlers
 
 open System
-open System.Threading.Tasks
+open System.Threading.Channels
 open Microsoft.AspNetCore.Http
-open Microsoft.AspNetCore.Routing
-open Microsoft.AspNetCore.Routing.Internal
-open Oxpecker
-open StarFederation.Datastar.FSharp
-open TicTacToe.Web.DatastarExtensions
-open TicTacToe.Web.templates
+open Microsoft.Extensions.DependencyInjection
+open Oxpecker.ViewEngine
+open Frank.Datastar
+open TicTacToe.Web.SseBroadcast
 open TicTacToe.Web.templates.shared
 open TicTacToe.Web.templates.game
 open TicTacToe.Engine
 open TicTacToe.Model
 
-let writeHtmlView f (ctx: HttpContext) =
-    f ctx |> layout.html ctx |> ctx.WriteHtmlView
+/// Signals type for move data from Datastar
+[<CLIMutable>]
+type MoveSignals =
+    { player: string
+      position: string }
 
-let home: EndpointHandler = writeHtmlView home.homePage
+// Module-level state for the home page game ID
+let mutable private homeGameId: string option = None
 
-let graph: EndpointHandler =
-    fun ctx ->
-        let graphWriter = ctx.GetService<DfaGraphWriter>()
-        let endpointDataSource = ctx.GetService<EndpointDataSource>()
-        use sw = new IO.StringWriter()
-        graphWriter.Write(endpointDataSource, sw)
-        ctx.Response.WriteAsync(sw.ToString())
-
-let games: EndpointHandler = writeHtmlView games.gamesPage
-
-let createGame: EndpointHandler =
-    fun ctx ->
-        let supervisor = ctx.GetService<GameSupervisor>()
-        let (gameId, _) = supervisor.CreateGame()
-        ctx.Response.StatusCode <- 302
-        ctx.Response.Headers.Location <- $"/games/{gameId}"
-        Task.CompletedTask
-
-let makeMove gameId : EndpointHandler =
-    fun ctx ->
-        task {
-            let supervisor = ctx.GetService<GameSupervisor>()
-
-            match supervisor.GetGame gameId with
-            | None -> ctx.Response.StatusCode <- 404
-            | Some game ->
-                let! form = ctx.Request.ReadFormAsync()
-                let player = form["player"].ToString()
-                let position = form["position"].ToString()
-
-                match Move.TryParse(player, position) with
-                | None -> ctx.Response.StatusCode <- 400
-                | Some move ->
-                    game.MakeMove move
-                    ctx.Response.StatusCode <- 202
-        }
-
-let gamePage gameId : EndpointHandler =
-    fun ctx ->
-        let supervisor = ctx.GetService<GameSupervisor>()
-
-        match supervisor.GetGame gameId with
+/// Get or create the home page game
+let private getOrCreateHomeGame (supervisor: GameSupervisor) =
+    match homeGameId with
+    | Some id ->
+        match supervisor.GetGame(id) with
+        | Some game -> (id, game)
         | None ->
-            ctx.Response.StatusCode <- 404
-            Task.CompletedTask
-        | Some _ -> ctx |> writeHtmlView (gamePage gameId)
+            // Game was cleaned up, create new one
+            let (newId, game) = supervisor.CreateGame()
+            homeGameId <- Some newId
+            (newId, game)
+    | None ->
+        let (newId, game) = supervisor.CreateGame()
+        homeGameId <- Some newId
+        (newId, game)
 
-let gameEvents gameId : EndpointHandler =
-    fun ctx ->
-        task {
-            let supervisor = ctx.GetService<GameSupervisor>()
+/// Reset the home page game
+let private resetHomeGame (supervisor: GameSupervisor) =
+    let (newId, game) = supervisor.CreateGame()
+    homeGameId <- Some newId
+    (newId, game)
 
-            match supervisor.GetGame gameId with
-            | None -> ctx.Response.StatusCode <- 404
-            | Some game ->
-                let datastar = ctx.GetService<ServerSentEventGenerator>()
-                do datastar.StartServerEventStreamAsync() |> ignore
+/// Home page handler
+let home (ctx: HttpContext) =
+    task {
+        let html = templates.home.homePage ctx |> layout.html ctx |> Render.toString
+        ctx.Response.ContentType <- "text/html; charset=utf-8"
+        do! ctx.Response.WriteAsync(html)
+    }
 
-                let htmlopts =
-                    { PatchElementsOptions.Defaults with
-                        Selector = ValueSome "#game-board" }
+/// SSE endpoint - sends game state updates
+let sse (ctx: HttpContext) =
+    task {
+        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let (_, game) = getOrCreateHomeGame supervisor
 
-                // Keep connection alive until client disconnects
-                let tcs = TaskCompletionSource()
+        let myChannel = subscribe ()
 
-                use subscription =
-                    game.Subscribe(
-                        { new IObserver<MoveResult> with
-                            member _.OnNext(result) =
-                                let html = renderGameBoard gameId result
-                                datastar.PatchHtmlViewAsync(html, htmlopts) |> ignore
+        try
+            // Subscribe to game state changes and forward to SSE channel
+            use _ =
+                game.Subscribe(
+                    { new IObserver<MoveResult> with
+                        member _.OnNext(result) =
+                            let html = renderGameBoard result |> Render.toString
+                            broadcast (PatchElements html)
+                        member _.OnError(_) = ()
+                        member _.OnCompleted() = () })
 
-                            member _.OnError(ex) =
-                                // TODO: render error notification
-                                tcs.TrySetException(ex) |> ignore
+            // Keep connection open, forwarding events from our channel
+            while not ctx.RequestAborted.IsCancellationRequested do
+                let! event = myChannel.Reader.ReadAsync(ctx.RequestAborted).AsTask()
+                do! writeSseEvent ctx event
+        with
+        | :? OperationCanceledException -> ()
+        | :? ChannelClosedException -> ()
+        | _ -> ()
 
-                            member _.OnCompleted() =
-                                // TODO: render winner notification
-                                tcs.TrySetResult() |> ignore }
-                    )
+        unsubscribe myChannel
+    }
 
-                use _reg =
-                    ctx.RequestAborted.Register(fun () ->
-                        try
-                            subscription.Dispose()
-                        with _ ->
-                            ()
+/// POST handler - make a move
+let move (ctx: HttpContext) =
+    task {
+        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
 
-                        tcs.TrySetResult() |> ignore)
+        let! signals = Datastar.tryReadSignals<MoveSignals> ctx
 
-                do! tcs.Task
-        }
+        match signals with
+        | ValueSome s ->
+            match Move.TryParse(s.player, s.position) with
+            | None ->
+                ctx.Response.StatusCode <- 400
+            | Some moveAction ->
+                let (_, game) = getOrCreateHomeGame supervisor
+                game.MakeMove(moveAction)
+                ctx.Response.StatusCode <- 202
+        | ValueNone ->
+            ctx.Response.StatusCode <- 400
+    }
+
+/// DELETE handler - reset/clear the game
+let reset (ctx: HttpContext) =
+    task {
+        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let (_, game) = resetHomeGame supervisor
+
+        // Subscribe briefly to trigger initial state broadcast
+        use _ = game.Subscribe(
+            { new IObserver<MoveResult> with
+                member _.OnNext(result) =
+                    let html = renderGameBoard result |> Render.toString
+                    broadcast (PatchElements html)
+                member _.OnError(_) = ()
+                member _.OnCompleted() = () })
+
+        ctx.Response.StatusCode <- 202
+    }

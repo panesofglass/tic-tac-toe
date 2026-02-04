@@ -14,9 +14,16 @@ let homePage (ctx: HttpContext) =
         div(class' = "game-container") {
             h1(class' = "title") { "Tic Tac Toe" }
 
-            // Game board container for SSE updates
-            // The board content will be populated via SSE on connection
-            div(id = "game-board", class' = "game-board-container") {
+            // New Game button - creates a game via POST /games
+            div(class' = "new-game-container") {
+                button(class' = "new-game-btn", type' = "button")
+                    .attr("data-on:click", "@post('/games')") {
+                    "New Game"
+                }
+            }
+
+            // Games container - games are appended here via SSE
+            div(id = "games-container", class' = "games-container") {
                 // Initial loading state - replaced by SSE on connect
                 div(class' = "loading") { "Connecting..." }
             }

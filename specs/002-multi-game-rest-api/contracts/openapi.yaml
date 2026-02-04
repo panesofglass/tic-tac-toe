@@ -1,0 +1,195 @@
+openapi: 3.1.0
+info:
+  title: Tic-Tac-Toe Multi-Game API
+  description: |
+    RESTful API for managing multiple tic-tac-toe games with hypermedia-driven updates.
+    Games are rendered on a single page with real-time updates via Server-Sent Events.
+  version: 1.0.0
+  contact:
+    name: Tic-Tac-Toe Project
+
+servers:
+  - url: http://localhost:5000
+    description: Development server
+
+paths:
+  /:
+    get:
+      operationId: getHomePage
+      summary: Get home page with games container
+      description: Returns HTML page with games container and SSE connection initialization
+      responses:
+        '200':
+          description: HTML page with Datastar initialization
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /games:
+    post:
+      operationId: createGame
+      summary: Create a new game
+      description: Creates a new tic-tac-toe game and returns its resource URL
+      responses:
+        '201':
+          description: Game created successfully
+          headers:
+            Location:
+              description: URL of the newly created game resource
+              schema:
+                type: string
+                format: uri
+                example: /games/550e8400-e29b-41d4-a716-446655440000
+
+  /games/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Unique game identifier (GUID)
+        schema:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+
+    get:
+      operationId: getGame
+      summary: Get a specific game
+      description: Returns the current state of a game as HTML
+      responses:
+        '200':
+          description: Game state as HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Game not found
+
+    post:
+      operationId: makeMove
+      summary: Make a move in a game
+      description: |
+        Submits a move to the game. Move data is sent via Datastar signals.
+        The server broadcasts the updated state to all connected clients via SSE.
+      requestBody:
+        description: Datastar signals containing move data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveSignals'
+      responses:
+        '202':
+          description: Move accepted and queued for processing
+        '400':
+          description: Invalid move data (bad player or position)
+        '404':
+          description: Game not found
+
+    delete:
+      operationId: deleteGame
+      summary: Delete a game
+      description: Removes the game from the server and broadcasts removal to all clients via SSE
+      responses:
+        '204':
+          description: Game deleted successfully
+        '404':
+          description: Game not found
+
+  /sse:
+    get:
+      operationId: sseEndpoint
+      summary: Server-Sent Events endpoint
+      description: |
+        Long-lived SSE connection for receiving real-time game updates.
+        All game state changes are pushed through this endpoint.
+      responses:
+        '200':
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Stream of Datastar events:
+                  - datastar-patch-elements: Update game board HTML
+                  - datastar-remove-elements: Remove deleted game
+
+components:
+  schemas:
+    MoveSignals:
+      type: object
+      description: Datastar signals for move submission
+      required:
+        - gameId
+        - player
+        - position
+      properties:
+        gameId:
+          type: string
+          format: uuid
+          description: ID of the game to make move in
+          example: 550e8400-e29b-41d4-a716-446655440000
+        player:
+          type: string
+          enum: [X, O]
+          description: Player making the move
+          example: X
+        position:
+          type: string
+          enum:
+            - TopLeft
+            - TopCenter
+            - TopRight
+            - MiddleLeft
+            - MiddleCenter
+            - MiddleRight
+            - BottomLeft
+            - BottomCenter
+            - BottomRight
+          description: Board position for the move
+          example: MiddleCenter
+
+    GameState:
+      type: object
+      description: Current state of a game (conceptual - delivered as HTML)
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Game identifier
+        status:
+          type: string
+          enum:
+            - x_turn
+            - o_turn
+            - x_won
+            - o_won
+            - draw
+          description: Current game status
+        board:
+          type: array
+          items:
+            type: string
+            enum: [X, O, ""]
+          minItems: 9
+          maxItems: 9
+          description: Board state as 9 squares (TopLeft to BottomRight)
+
+    SseEvent:
+      type: object
+      description: SSE event format for Datastar
+      properties:
+        event:
+          type: string
+          enum:
+            - datastar-patch-elements
+            - datastar-remove-elements
+          description: Event type
+        data:
+          type: string
+          description: |
+            For patch-elements: HTML content with id attribute for targeting
+            For remove-elements: CSS selector for element to remove

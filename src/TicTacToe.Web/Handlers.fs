@@ -15,33 +15,29 @@ open TicTacToe.Model
 /// Signals type for move data from Datastar
 [<CLIMutable>]
 type MoveSignals =
-    { player: string
+    { gameId: string
+      player: string
       position: string }
 
-// Module-level state for the home page game ID
-let mutable private homeGameId: string option = None
+// Active game subscriptions - maps gameId to subscription disposable
+let private gameSubscriptions = System.Collections.Concurrent.ConcurrentDictionary<string, IDisposable>()
 
-/// Get or create the home page game
-let private getOrCreateHomeGame (supervisor: GameSupervisor) =
-    match homeGameId with
-    | Some id ->
-        match supervisor.GetGame(id) with
-        | Some game -> (id, game)
-        | None ->
-            // Game was cleaned up, create new one
-            let (newId, game) = supervisor.CreateGame()
-            homeGameId <- Some newId
-            (newId, game)
-    | None ->
-        let (newId, game) = supervisor.CreateGame()
-        homeGameId <- Some newId
-        (newId, game)
-
-/// Reset the home page game
-let private resetHomeGame (supervisor: GameSupervisor) =
-    let (newId, game) = supervisor.CreateGame()
-    homeGameId <- Some newId
-    (newId, game)
+/// Subscribe to a game's state changes and broadcast updates
+let private subscribeToGame (gameId: string) (game: Game) =
+    if not (gameSubscriptions.ContainsKey(gameId)) then
+        let subscription =
+            game.Subscribe(
+                { new IObserver<MoveResult> with
+                    member _.OnNext(result) =
+                        let html = renderGameBoard gameId result |> Render.toString
+                        broadcast (PatchElements html)
+                    member _.OnError(_) = ()
+                    member _.OnCompleted() =
+                        // Game completed - remove subscription
+                        match gameSubscriptions.TryRemove(gameId) with
+                        | true, sub -> sub.Dispose()
+                        | _ -> () })
+        gameSubscriptions.TryAdd(gameId, subscription) |> ignore
 
 /// Home page handler
 let home (ctx: HttpContext) =
@@ -51,26 +47,16 @@ let home (ctx: HttpContext) =
         do! ctx.Response.WriteAsync(html)
     }
 
-/// SSE endpoint - sends game state updates
+/// SSE endpoint - sends game state updates to all connected clients
 let sse (ctx: HttpContext) =
     task {
-        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
-        let (_, game) = getOrCreateHomeGame supervisor
-
         let myChannel = subscribe ()
 
         try
-            // Subscribe to game state changes and forward to SSE channel
-            use _ =
-                game.Subscribe(
-                    { new IObserver<MoveResult> with
-                        member _.OnNext(result) =
-                            let html = renderGameBoard result |> Render.toString
-                            broadcast (PatchElements html)
-                        member _.OnError(_) = ()
-                        member _.OnCompleted() = () })
+            // Clear loading state when client connects
+            do! Datastar.patchElements """<div id="games-container" class="games-container"></div>""" ctx
 
-            // Keep connection open, forwarding events from our channel
+            // Keep connection open, forwarding all broadcast events
             while not ctx.RequestAborted.IsCancellationRequested do
                 let! event = myChannel.Reader.ReadAsync(ctx.RequestAborted).AsTask()
                 do! writeSseEvent ctx event
@@ -82,40 +68,106 @@ let sse (ctx: HttpContext) =
         unsubscribe myChannel
     }
 
-/// POST handler - make a move
-let move (ctx: HttpContext) =
+
+// ============================================================================
+// REST API Handlers for Multi-Game Support
+// ============================================================================
+
+/// POST /games - Create a new game
+let createGame (ctx: HttpContext) =
     task {
         let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let (gameId, game) = supervisor.CreateGame()
 
-        let! signals = Datastar.tryReadSignals<MoveSignals> ctx
+        // Subscribe to game state changes
+        subscribeToGame gameId game
 
-        match signals with
-        | ValueSome s ->
-            match Move.TryParse(s.player, s.position) with
-            | None ->
-                ctx.Response.StatusCode <- 400
-            | Some moveAction ->
-                let (_, game) = getOrCreateHomeGame supervisor
-                game.MakeMove(moveAction)
-                ctx.Response.StatusCode <- 202
-        | ValueNone ->
-            ctx.Response.StatusCode <- 400
-    }
-
-/// DELETE handler - reset/clear the game
-let reset (ctx: HttpContext) =
-    task {
-        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
-        let (_, game) = resetHomeGame supervisor
-
-        // Subscribe briefly to trigger initial state broadcast
-        use _ = game.Subscribe(
+        // Get initial state and broadcast to all clients
+        use initialSub = game.Subscribe(
             { new IObserver<MoveResult> with
                 member _.OnNext(result) =
-                    let html = renderGameBoard result |> Render.toString
-                    broadcast (PatchElements html)
+                    let html = renderGameBoard gameId result |> Render.toString
+                    broadcast (PatchElementsAppend("#games-container", html))
                 member _.OnError(_) = ()
                 member _.OnCompleted() = () })
 
-        ctx.Response.StatusCode <- 202
+        // Return 201 Created with Location header
+        ctx.Response.StatusCode <- 201
+        ctx.Response.Headers.Location <- $"/games/{gameId}"
+    }
+
+/// GET /games/{id} - Get a specific game
+let getGame (ctx: HttpContext) =
+    task {
+        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let gameId = ctx.Request.RouteValues.["id"] |> string
+
+        match supervisor.GetGame(gameId) with
+        | Some game ->
+            // Subscribe to ensure updates are broadcast
+            subscribeToGame gameId game
+
+            // Get current state via a temporary subscription
+            let mutable currentResult: MoveResult option = None
+            use tempSub = game.Subscribe(
+                { new IObserver<MoveResult> with
+                    member _.OnNext(result) = currentResult <- Some result
+                    member _.OnError(_) = ()
+                    member _.OnCompleted() = () })
+
+            match currentResult with
+            | Some result ->
+                let gameHtml = renderGameBoard gameId result
+                let html = gameHtml |> layout.html ctx |> Render.toString
+                ctx.Response.ContentType <- "text/html; charset=utf-8"
+                do! ctx.Response.WriteAsync(html)
+            | None ->
+                ctx.Response.StatusCode <- 500
+        | None ->
+            ctx.Response.StatusCode <- 404
+    }
+
+/// POST /games/{id} - Make a move in a specific game
+let makeMove (ctx: HttpContext) =
+    task {
+        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let gameId = ctx.Request.RouteValues.["id"] |> string
+
+        match supervisor.GetGame(gameId) with
+        | Some game ->
+            let! signals = Datastar.tryReadSignals<MoveSignals> ctx
+
+            match signals with
+            | ValueSome s ->
+                match Move.TryParse(s.player, s.position) with
+                | None ->
+                    ctx.Response.StatusCode <- 400
+                | Some moveAction ->
+                    // Ensure we're subscribed to broadcast updates
+                    subscribeToGame gameId game
+                    game.MakeMove(moveAction)
+                    ctx.Response.StatusCode <- 202
+            | ValueNone ->
+                ctx.Response.StatusCode <- 400
+        | None ->
+            ctx.Response.StatusCode <- 404
+    }
+
+/// DELETE /games/{id} - Delete a game
+let deleteGame (ctx: HttpContext) =
+    task {
+        let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let gameId = ctx.Request.RouteValues.["id"] |> string
+
+        match supervisor.GetGame(gameId) with
+        | Some game ->
+            // Dispose the game - this triggers OnCompleted which removes subscription
+            game.Dispose()
+
+            // Broadcast removal to all clients
+            broadcast (RemoveElement $"#game-{gameId}")
+
+            ctx.Response.StatusCode <- 204
+        | None ->
+            ctx.Response.StatusCode <- 404
     }

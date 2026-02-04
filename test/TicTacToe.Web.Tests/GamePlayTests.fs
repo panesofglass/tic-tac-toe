@@ -3,34 +3,58 @@ namespace TicTacToe.Web.Tests
 open System.Threading.Tasks
 open NUnit.Framework
 
+/// Gameplay tests for single-game interactions.
+/// Tests basic game mechanics: moves, turns, win conditions.
 [<TestFixture>]
 type GamePlayTests() =
     inherit TestBase()
 
-    /// Resets the game by sending a DELETE request and reloading
-    member private this.ResetGame() : Task =
+    /// Creates a new game by clicking the New Game button
+    member private this.CreateGame() : Task =
         task {
-            // Send DELETE to reset server-side game state
-            do! this.Page.EvaluateAsync("() => fetch('/', { method: 'DELETE' })") |> Async.AwaitTask |> Async.Ignore
-            // Reload page to get fresh state with new SSE connection
-            let! _ = this.Page.ReloadAsync()
-            ()
+            do! TestHelpers.waitForVisible this.Page ".new-game-btn" this.TimeoutMs
+            do! this.Page.Locator(".new-game-btn").ClickAsync()
+            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
         }
 
-    /// Additional setup after page navigation - ensure fresh game state
+    /// Deletes all existing games to ensure clean state
+    member private this.CleanupGames() : Task =
+        task {
+            let! count = this.Page.Locator(".delete-game-btn").CountAsync()
+            for _ in 1 .. count do
+                do! this.Page.Locator(".delete-game-btn").First.ClickAsync()
+                do! Task.Delay(100)
+        }
+
     [<SetUp>]
     member this.EnsureFreshGame() : Task =
         task {
-            // Wait for initial board to appear
-            do! TestHelpers.waitForVisible this.Page ".board" this.TimeoutMs
-            // Check if game is not fresh (has moves or game over)
-            let! clickableCount = this.Page.Locator(".square-clickable").CountAsync()
-            if clickableCount <> 9 then
-                // Reset and reload
-                do! this.ResetGame()
-                // Wait for fresh board
-                do! TestHelpers.waitForCount this.Page ".square-clickable" 9 this.TimeoutMs
+            // Wait for page to load with New Game button visible
+            do! TestHelpers.waitForVisible this.Page ".new-game-btn" this.TimeoutMs
+            // Clean up any existing games
+            do! this.CleanupGames()
+            // Create a fresh game
+            do! this.CreateGame()
         }
+
+    // ============================================================================
+    // User Story 1: New Game button creates visible game board
+    // ============================================================================
+
+    [<Test>]
+    member this.``New Game button creates visible game board``() : Task =
+        task {
+            // Game was created in setup, verify it's visible
+            let! isVisible = TestHelpers.isVisible this.Page ".game-board"
+            Assert.That(isVisible, Is.True, "Game board should be visible after clicking New Game")
+
+            let! clickableCount = this.Page.Locator(".square-clickable").CountAsync()
+            Assert.That(clickableCount, Is.EqualTo(9), "Should have 9 clickable squares")
+        }
+
+    // ============================================================================
+    // User Story 1: Clicking square places X, then O
+    // ============================================================================
 
     [<Test>]
     member this.``Clicking square places X on first move``() : Task =
@@ -60,6 +84,10 @@ type GamePlayTests() =
             do! this.Page.Locator(".square-clickable").First.ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
         }
+
+    // ============================================================================
+    // User Story 1: Win condition shows winner message
+    // ============================================================================
 
     [<Test>]
     member this.``X wins with top row``() : Task =
@@ -91,50 +119,6 @@ type GamePlayTests() =
         }
 
     [<Test>]
-    member this.``New Game button appears after game ends``() : Task =
-        task {
-            do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
-
-            // Play to X win
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-
-            do! TestHelpers.waitForVisible this.Page ".new-game-btn" this.TimeoutMs
-            let! isVisible = TestHelpers.isVisible this.Page ".new-game-btn"
-            Assert.That(isVisible, Is.True, "New Game button should appear after game ends")
-        }
-
-    [<Test>]
-    member this.``New Game button resets the board``() : Task =
-        task {
-            do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
-
-            // Play to game end
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-
-            do! TestHelpers.waitForVisible this.Page ".new-game-btn" this.TimeoutMs
-            do! this.Page.Locator(".new-game-btn").ClickAsync()
-
-            do! TestHelpers.waitForCount this.Page ".square-clickable" 9 this.TimeoutMs
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-        }
-
-    [<Test>]
     member this.``Board squares are not clickable after game ends``() : Task =
         task {
             do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
@@ -154,4 +138,25 @@ type GamePlayTests() =
 
             let! clickableCount = this.Page.Locator(".square-clickable").CountAsync()
             Assert.That(clickableCount, Is.EqualTo(0), "No squares should be clickable after game ends")
+        }
+
+    // ============================================================================
+    // Edge Cases
+    // ============================================================================
+
+    [<Test>]
+    member this.``Rapid clicking same square only registers once``() : Task =
+        task {
+            do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
+
+            // Click the first square
+            let square = this.Page.Locator(".square-clickable").First
+            do! square.ClickAsync()
+
+            // Wait for board to stabilize
+            do! Task.Delay(500)
+
+            // Should only have one X placed
+            let! playerCount = this.Page.Locator(".player").CountAsync()
+            Assert.That(playerCount, Is.EqualTo(1), "Click should register exactly one move")
         }

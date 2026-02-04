@@ -32,8 +32,10 @@ let createWonResult gameState winner = Won(gameState, winner)
 let createDrawResult gameState = Draw(gameState)
 let createErrorResult gameState message = Error(gameState, message)
 
+let testGameId = "test-game-123"
+
 let renderGameBoardToString result =
-    let element = renderGameBoard result
+    let element = renderGameBoard testGameId result
     Render.toString element
 
 [<Tests>]
@@ -101,9 +103,9 @@ let tests =
               let html = renderGameBoardToString result
 
               Expect.stringContains html "X wins!" "Should show X win message"
-              Expect.stringContains html "New Game" "Should show new game button"
-              Expect.stringContains html "new-game-btn" "Should have new game button class"
-              Expect.stringContains html "@delete(&#39;/&#39;)" "Should have DELETE action for reset"
+              Expect.stringContains html "Delete Game" "Should show delete game button"
+              Expect.stringContains html "delete-game-btn" "Should have delete game button class"
+              Expect.stringContains html $"@delete(&#39;/games/{testGameId}&#39;)" "Should have DELETE action for this game"
               Expect.isFalse (html.Contains("square-clickable")) "Should not have any clickable squares"
 
           testCase "Draw game renders correctly"
@@ -118,7 +120,7 @@ let tests =
               let html = renderGameBoardToString result
 
               Expect.stringContains html "It&#39;s a draw!" "Should show draw message"
-              Expect.stringContains html "New Game" "Should show new game button"
+              Expect.stringContains html "Delete Game" "Should show delete game button"
               Expect.isFalse (html.Contains("square-clickable")) "Should not have any clickable squares"
 
           testCase "Error state renders correctly"
@@ -155,7 +157,7 @@ let tests =
               let result = createOTurnResult gameState remainingMoves
               let html = renderGameBoardToString result
 
-              Expect.stringContains html "@post(&#39;/&#39;)" "Should have POST to root resource"
+              Expect.stringContains html $"@post(&#39;/games/{testGameId}&#39;)" "Should have POST to game resource"
               Expect.stringContains html "$player = &#39;O&#39;" "Should set player signal in click handler"
               Expect.stringContains html "$position = &#39;TopCenter&#39;" "Should set position signal in click handler"
 

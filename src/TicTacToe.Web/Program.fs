@@ -56,14 +56,26 @@ let home =
     resource "/" {
         name "Home"
         get Handlers.home
-        post Handlers.move
-        delete Handlers.reset
     }
 
 let sse =
     resource "/sse" {
         name "SSE"
         datastar Handlers.sse
+    }
+
+let games =
+    resource "/games" {
+        name "Games"
+        post Handlers.createGame
+    }
+
+let gameById =
+    resource "/games/{id}" {
+        name "GameById"
+        get Handlers.getGame
+        post Handlers.makeMove
+        delete Handlers.deleteGame
     }
 
 [<EntryPoint>]
@@ -89,6 +101,8 @@ let main args =
 
         resource home
         resource sse
+        resource games
+        resource gameById
     }
 
     0

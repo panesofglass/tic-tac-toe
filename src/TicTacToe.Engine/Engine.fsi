@@ -9,6 +9,9 @@ type Game =
     /// Make a move in the game
     abstract MakeMove: Model.Move -> unit
 
+    /// Get current game state synchronously
+    abstract GetState: unit -> Model.MoveResult
+
 /// Supervisor that manages game lifecycles and provides game instances
 type GameSupervisor =
     inherit System.IDisposable

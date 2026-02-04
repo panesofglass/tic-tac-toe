@@ -1,7 +1,6 @@
 module TicTacToe.Engine
 
 open System
-open System.Reactive.Subjects
 open System.Threading
 open TicTacToe.Model
 
@@ -9,66 +8,109 @@ type Game =
     inherit IDisposable
     inherit IObservable<MoveResult>
     abstract MakeMove: Move -> unit
+    abstract GetState: unit -> MoveResult
 
 /// Internal message type for the game actor
 type GameMessage =
     | MakeMove of Move
+    | Subscribe of IObserver<MoveResult> * AsyncReplyChannel<IDisposable>
+    | Unsubscribe of int
+    | GetState of AsyncReplyChannel<MoveResult>
     | Stop
 
-/// Game actor implementation using MailboxProcessor and BehaviorSubject for broadcast semantics
+/// Internal actor state for managing game and subscribers
+type private GameActorState = {
+    GameState: MoveResult
+    Subscribers: Map<int, IObserver<MoveResult>>
+    NextId: int
+    Completed: bool
+}
+
+/// Game actor implementation using pure MailboxProcessor with IObservable interface
 type GameImpl() =
     let initialState = startGame ()
-    let outbox = new BehaviorSubject<MoveResult>(initialState)
-
     let mutable disposed = false
 
     let agent =
         MailboxProcessor<GameMessage>.Start(fun inbox ->
-            let rec messageLoop state =
+            /// Broadcast state to all subscribers with error protection
+            let notifyAll (subs: Map<int, IObserver<MoveResult>>) result =
+                subs |> Map.iter (fun _ observer ->
+                    try observer.OnNext(result) with _ -> ())
+
+            /// Call OnCompleted for all subscribers with error protection
+            let notifyComplete (subs: Map<int, IObserver<MoveResult>>) =
+                subs |> Map.iter (fun _ observer ->
+                    try observer.OnCompleted() with _ -> ())
+
+            let rec messageLoop (state: GameActorState) =
                 async {
-                    try
-                        let! message = inbox.Receive()
+                    let! message = inbox.Receive()
 
-                        match message with
-                        | Stop -> ()
-                        | MakeMove(move) ->
-                            let nextState = makeMove (state, move)
-                            outbox.OnNext(nextState)
+                    match message with
+                    | Stop ->
+                        if not state.Completed then
+                            notifyComplete state.Subscribers
 
-                            match nextState with
-                            | Won _
-                            | Draw _ -> outbox.OnCompleted()
-                            | Error _ ->
-                                outbox.OnNext(state)
-                                return! messageLoop state
-                            | XTurn _
-                            | OTurn _ -> return! messageLoop nextState
-                    with ex ->
-                        outbox.OnError(ex)
+                    | GetState reply ->
+                        reply.Reply(state.GameState)
+                        return! messageLoop state
+
+                    | Subscribe(observer, reply) ->
+                        let id = state.NextId
+                        let handle =
+                            { new IDisposable with
+                                member _.Dispose() = inbox.Post(Unsubscribe id) }
+                        let newSubs = state.Subscribers |> Map.add id observer
+                        // Emit current state immediately (BehaviorSubject semantics)
+                        try observer.OnNext(state.GameState) with _ -> ()
+                        reply.Reply(handle)
+                        return! messageLoop { state with Subscribers = newSubs; NextId = id + 1 }
+
+                    | Unsubscribe id ->
+                        let newSubs = state.Subscribers |> Map.remove id
+                        return! messageLoop { state with Subscribers = newSubs }
+
+                    | MakeMove move ->
+                        let nextResult = makeMove (state.GameState, move)
+                        notifyAll state.Subscribers nextResult
+
+                        match nextResult with
+                        | Won _ | Draw _ ->
+                            notifyComplete state.Subscribers
+                            return! messageLoop { state with GameState = nextResult; Completed = true }
+                        | Error _ ->
+                            notifyAll state.Subscribers state.GameState
+                            return! messageLoop state
+                        | XTurn _ | OTurn _ ->
+                            return! messageLoop { state with GameState = nextResult }
                 }
 
-            messageLoop initialState)
+            messageLoop {
+                GameState = initialState
+                Subscribers = Map.empty
+                NextId = 0
+                Completed = false
+            })
 
     interface Game with
         member _.MakeMove(move: Move) =
             if disposed then
                 raise (ObjectDisposedException("Game"))
             else
-                let message = MakeMove(move)
-                agent.Post(message)
+                agent.Post(MakeMove move)
 
-        member _.Subscribe(observer) = outbox.Subscribe(observer)
+        member _.GetState() =
+            agent.PostAndReply(GetState)
 
         member _.Dispose() =
             if not disposed then
                 disposed <- true
-
-                // Send stop message to gracefully stop the message loop
                 agent.Post(Stop)
 
-                if not outbox.IsDisposed then
-                    outbox.OnCompleted()
-                    outbox.Dispose()
+    interface IObservable<MoveResult> with
+        member _.Subscribe(observer) =
+            agent.PostAndReply(fun reply -> Subscribe(observer, reply))
 
 let createGame () : Game = new GameImpl() :> Game
 
@@ -118,7 +160,7 @@ type GameSupervisorImpl() as this =
                                 { new IObserver<MoveResult> with
                                     member _.OnNext(_) = ()
                                     member _.OnCompleted() = this.RemoveGame(gameId)
-                                    member _.OnError(_) = this.RemoveGame(gameId) } // Remove game on system errors
+                                    member _.OnError(_) = this.RemoveGame(gameId) }
                             )
 
                         let gameRef =

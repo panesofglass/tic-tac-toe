@@ -1,28 +1,17 @@
 open System
 open System.IO.Compression
-open System.Text.Json.Serialization
 open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.ResponseCompression
-open Microsoft.AspNetCore.Routing
-open Microsoft.AspNetCore.Routing.Internal
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
-open Oxpecker
 open Frank.Builder
+open Frank.Datastar
 open TicTacToe.Web
-open TicTacToe.Web.DatastarExtensions
-open TicTacToe.Web.Extensions
 open TicTacToe.Engine
-
-let jsonOptions =
-    JsonFSharpOptions
-        .Default()
-        .WithUnionUnwrapFieldlessTags()
-        .WithSkippableOptionFields(SkippableOptionFields.Always, deserializeNullAsNone = true)
-        .ToJsonSerializerOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)
+open TicTacToe.Web.Extensions
 
 let configureServices (services: IServiceCollection) =
     services.AddRouting().AddHttpContextAccessor() |> ignore
@@ -41,23 +30,13 @@ let configureServices (services: IServiceCollection) =
     |> ignore
 
     services
-        .AddOxpecker()
-        .AddDatastar()
-        .AddSingleton<IClaimsTransformation, GameUserClaimsTransformation>()
-        .AddSingleton<IJsonSerializer>(SystemTextJsonSerializer(jsonOptions))
         .AddSingleton<GameSupervisor>(fun _ -> createGameSupervisor ())
+        .AddSingleton<IClaimsTransformation, GameUserClaimsTransformation>()
         .AddResponseCompression(fun opts ->
             opts.EnableForHttps <- true
-
             opts.MimeTypes <-
                 ResponseCompressionDefaults.MimeTypes
-                |> Seq.append (
-                    seq {
-                        "image/svg+xml"
-                        "text/event-stream"
-                    }
-                )
-
+                |> Seq.append [ "image/svg+xml"; "text/event-stream" ]
             opts.Providers.Add<BrotliCompressionProvider>()
             opts.Providers.Add<GzipCompressionProvider>())
     |> ignore
@@ -72,45 +51,19 @@ let configureServices (services: IServiceCollection) =
 
     services
 
+// Resources
 let home =
     resource "/" {
         name "Home"
         get Handlers.home
+        post Handlers.move
+        delete Handlers.reset
     }
 
-let graph =
-    resource "graph" {
-        name "Graph"
-        get Handlers.graph
-    }
-
-let games =
-    resource "games" {
-        name "Games"
-        get Handlers.games
-        post (Handlers.createGame)
-    }
-
-let game =
-    resource "games/{gameId}" {
-        name "Game"
-
-        get (fun (ctx: HttpContext) ->
-            let gameId = ctx.GetRouteValue("gameId") |> string
-            ctx |> Handlers.gamePage gameId)
-
-        post (fun (ctx: HttpContext) ->
-            let gameId = ctx.GetRouteValue("gameId") |> string
-            ctx |> Handlers.makeMove gameId)
-    }
-
-let gameEvents =
-    resource "games/{gameId}/events" {
-        name "Game Events"
-
-        get (fun (ctx: HttpContext) ->
-            let gameId = ctx.GetRouteValue("gameId") |> string
-            ctx |> Handlers.gameEvents gameId)
+let sse =
+    resource "/sse" {
+        name "SSE"
+        datastar Handlers.sse
     }
 
 [<EntryPoint>]
@@ -121,14 +74,8 @@ let main args =
         service configureServices
 
         logging (fun builder ->
-            // Configure standard Microsoft logging
             builder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning) |> ignore
-            // Configure application authentication logging
             builder.AddFilter("TicTacToe.Web.Auth", LogLevel.Information) |> ignore
-
-            builder.AddFilter("TicTacToe.Web.GameUserClaimsTransformation", LogLevel.Debug)
-            |> ignore
-
             builder)
 
         plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
@@ -141,10 +88,7 @@ let main args =
         plug AntiforgeryApplicationBuilderExtensions.UseAntiforgery
 
         resource home
-        resource graph
-        resource games
-        resource game
-        resource gameEvents
+        resource sse
     }
 
     0

@@ -1,6 +1,5 @@
 module TicTacToe.Web.templates.game
 
-open Microsoft.AspNetCore.Http
 open Oxpecker.ViewEngine
 open TicTacToe.Model
 
@@ -24,7 +23,6 @@ let private isValidMove (validMoves: SquarePosition array) (position: SquarePosi
     validMoves |> Array.contains position
 
 let private renderSquare
-    (gameId: string)
     (gameState: GameState)
     (validMoves: SquarePosition array)
     (currentPlayer: Player option)
@@ -37,27 +35,25 @@ let private renderSquare
 
     if canMove && currentPlayer.IsSome then
         let playerStr = currentPlayer.Value.ToString()
-        // Clickable button for valid moves
-        (((button (class' = "square square-clickable", type' = "button"))
-            .data ("on-click", $"@post('/games/{gameId}/moves')"))
-            .data ("player", playerStr))
-            .data ("position", positionStr) {
+        // Clickable button - sets signals in click handler then posts
+        button(class' = "square square-clickable", type' = "button")
+            .attr("data-on:click", sprintf "$player = '%s'; $position = '%s'; @post('/')" playerStr positionStr) {
             // Show preview of move on hover
-            span (class' = "preview") { playerStr }
+            span(class' = "preview") { playerStr }
         }
         :> HtmlElement
     else
         // Static cell - either taken or not player's turn
-        div (class' = "square") {
+        div(class' = "square") {
             if not (System.String.IsNullOrEmpty(value)) then
-                span (class' = "player") { value }
+                span(class' = "player") { value }
             else
-                span (class' = "empty") { "·" }
+                span(class' = "empty") { raw "·" }
         }
         :> HtmlElement
 
-// Render the current game state from a MoveResult
-let renderGameBoard (gameId: string) (result: MoveResult) =
+/// Render the current game state from a MoveResult
+let renderGameBoard (result: MoveResult) =
     let (gameState, currentPlayer, validMoves, status) =
         match result with
         | XTurn(state, moves) -> (state, Some X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
@@ -66,45 +62,32 @@ let renderGameBoard (gameId: string) (result: MoveResult) =
         | Draw state -> (state, None, [||], "It's a draw!")
         | Error(state, msg) -> (state, None, [||], $"Error: {msg}")
 
-    Fragment() {
+    let isGameOver = currentPlayer.IsNone
+
+    div(id = "game-board")
+        .attr("data-signals", "{player: '', position: ''}") {
         // Game status
-        div (class' = "status") { h2 () { status } }
+        div(class' = "status") { h2() { status } }
 
         // Game board - 3x3 grid
-        div (class' = "board") {
+        div(class' = "board") {
             for position in allPositions do
-                renderSquare gameId gameState validMoves currentPlayer position
+                renderSquare gameState validMoves currentPlayer position
         }
 
-        // Game controls
-        div (class' = "controls") {
-            if currentPlayer.IsNone then
-                (button (class' = "new-game-btn", type' = "button")).data ("on-click", "@post('/games')") { "New Game" }
-        }
-    }
-
-// Main game page that connects to SSE
-let gamePage (gameId: string) (ctx: HttpContext) =
-    ctx.Items["Title"] <- "Tic Tac Toe"
-
-    Fragment() {
-        div (class' = "game-container") {
-            h1 (class' = "title") { "Tic Tac Toe" }
-
-            // Game board container that will be updated via SSE
-            ((div (id = "game-board", class' = "game-board-container")).data ("sse-connect", $"/games/{gameId}/events"))
-                .data ("sse-on-patch", "@patch") {
-                // Initial loading state
-                div (class' = "loading") { "Loading game..." }
-            }
-
-            div (class' = "game-info") { p () { $"Game ID: {gameId}" } }
+        // Game controls - New Game button appears after game ends
+        div(class' = "controls") {
+            if isGameOver then
+                button(class' = "new-game-btn", type' = "button")
+                    .attr("data-on:click", "@delete('/')") {
+                    "New Game"
+                }
         }
     }
 
-// CSS styles
+/// CSS styles for the game board
 let gameStyles =
-    style () {
+    style() {
         raw
             """
         .game-container {
@@ -199,13 +182,6 @@ let gameStyles =
 
         .new-game-btn:hover {
             background-color: #45a049;
-        }
-
-        .game-info {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.9em;
-            color: #666;
         }
 
         .loading {

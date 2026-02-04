@@ -26,10 +26,10 @@ module layout =
 
                 script (
                     type' = "module",
-                    src = "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.5/bundles/datastar.js",
+                    src = "https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js",
                     crossorigin = "anonymous"
                 )
             }
 
-            body () { mainLayout ctx content }
+            body().attr("data-init", "@get('/sse')") { mainLayout ctx content }
         }

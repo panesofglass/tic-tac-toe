@@ -1,32 +1,33 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
-    <GenerateProgramFile>false</GenerateProgramFile>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AuthTests.fs" />
-    <Compile Include="PageRenderingTests.fs" />
-    <Compile Include="HandlerTests.fs" />
     <Compile Include="GameBoardTests.fs" />
-    <Compile Include="MoveInteractionTests.fs" />
-    <Compile Include="Main.fs" />
+    <Compile Include="AuthTests.fs" />
+    <Compile Include="TestHelpers.fs" />
+    <Compile Include="TestBase.fs" />
+    <Compile Include="HomePageTests.fs" />
+    <Compile Include="GamePlayTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="9.0.303" />
+    <PackageReference Update="FSharp.Core" Version="10.0.102" />
     <PackageReference Include="Expecto" Version="10.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication" Version="2.3.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Cookies" Version="2.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.15.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="Microsoft.Playwright.NUnit" Version="1.*" />
+    <PackageReference Include="NUnit" Version="4.*" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.*" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TicTacToe.Engine\TicTacToe.Engine.fsproj" />
     <ProjectReference Include="..\..\src\TicTacToe.Web\TicTacToe.Web.fsproj" />
   </ItemGroup>
+
 </Project>

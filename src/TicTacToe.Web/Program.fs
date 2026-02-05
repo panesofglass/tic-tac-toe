@@ -10,6 +10,7 @@ open Microsoft.Extensions.Logging
 open Frank.Builder
 open Frank.Datastar
 open TicTacToe.Web
+open TicTacToe.Web.Model
 open TicTacToe.Engine
 open TicTacToe.Web.Extensions
 
@@ -19,7 +20,11 @@ let configureServices (services: IServiceCollection) =
     services
         .AddAuthorization()
         .AddAntiforgery()
-        .AddAuthentication(fun options -> options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddAuthentication(fun options ->
+            options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme
+            options.DefaultAuthenticateScheme <- CookieAuthenticationDefaults.AuthenticationScheme
+            options.DefaultChallengeScheme <- CookieAuthenticationDefaults.AuthenticationScheme
+            options.DefaultSignInScheme <- CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(fun options ->
             options.Cookie.Name <- "TicTacToe.User"
             options.Cookie.HttpOnly <- true
@@ -31,12 +36,15 @@ let configureServices (services: IServiceCollection) =
 
     services
         .AddSingleton<GameSupervisor>(fun _ -> createGameSupervisor ())
+        .AddSingleton<PlayerAssignmentManager>(fun _ -> PlayerAssignmentManager())
         .AddSingleton<IClaimsTransformation, GameUserClaimsTransformation>()
         .AddResponseCompression(fun opts ->
             opts.EnableForHttps <- true
+
             opts.MimeTypes <-
                 ResponseCompressionDefaults.MimeTypes
                 |> Seq.append [ "image/svg+xml"; "text/event-stream" ]
+
             opts.Providers.Add<BrotliCompressionProvider>()
             opts.Providers.Add<GzipCompressionProvider>())
     |> ignore
@@ -52,6 +60,24 @@ let configureServices (services: IServiceCollection) =
     services
 
 // Resources
+let login =
+    resource "/login" {
+        name "Login"
+        get Handlers.login
+    }
+
+let logout =
+    resource "/logout" {
+        name "Logout"
+        get Handlers.logout
+    }
+
+let debug =
+    resource "/debug" {
+        name "Debug"
+        get Handlers.debug
+    }
+
 let home =
     resource "/" {
         name "Home"
@@ -93,12 +119,15 @@ let main args =
         plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
         plugWhenNot isDevelopment (fun app -> ExceptionHandlerExtensions.UseExceptionHandler(app, "/error", true))
 
-        plug ResponseCompressionBuilderExtensions.UseResponseCompression
-        plug StaticFileExtensions.UseStaticFiles
-        plug AuthAppBuilderExtensions.UseAuthentication
-        plug AuthorizationAppBuilderExtensions.UseAuthorization
-        plug AntiforgeryApplicationBuilderExtensions.UseAntiforgery
+        plugBeforeRouting ResponseCompressionBuilderExtensions.UseResponseCompression
+        plugBeforeRouting StaticFileExtensions.UseStaticFiles
+        plugBeforeRouting AuthAppBuilderExtensions.UseAuthentication
+        plugBeforeRouting AuthorizationAppBuilderExtensions.UseAuthorization
+        plugBeforeRouting AntiforgeryApplicationBuilderExtensions.UseAntiforgery
 
+        resource login
+        resource logout
+        resource debug
         resource home
         resource sse
         resource games

@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Model.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="Auth.fs" />
     <Compile Include="SseBroadcast.fs" />
@@ -23,8 +24,8 @@
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="10.0.102" />
-    <PackageReference Include="Frank" Version="6.4.1" />
-    <PackageReference Include="Frank.Datastar" Version="6.4.1" />
+    <PackageReference Include="Frank" Version="6.5.0" />
+    <PackageReference Include="Frank.Datastar" Version="6.5.0" />
     <PackageReference Include="Oxpecker.ViewEngine" Version="1.1.0" />
   </ItemGroup>
 

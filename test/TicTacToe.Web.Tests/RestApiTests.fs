@@ -11,6 +11,7 @@ open NUnit.Framework
 [<TestFixture>]
 type RestApiTests() =
     let mutable client: HttpClient = null
+    let mutable handler: HttpClientHandler = null
 
     let baseUrl =
         Environment.GetEnvironmentVariable("TEST_BASE_URL")
@@ -20,13 +21,29 @@ type RestApiTests() =
 
     [<OneTimeSetUp>]
     member _.Setup() =
-        client <- new HttpClient(BaseAddress = Uri(baseUrl))
+        // Use handler with cookie container to maintain session
+        handler <- new HttpClientHandler(
+            CookieContainer = CookieContainer(),
+            AllowAutoRedirect = true
+        )
+        client <- new HttpClient(handler, BaseAddress = Uri(baseUrl))
 
     [<OneTimeTearDown>]
     member _.Teardown() =
         if not (isNull client) then
             client.Dispose()
             client <- null
+        if not (isNull handler) then
+            handler.Dispose()
+            handler <- null
+
+    /// Helper to ensure client is authenticated with a cookie
+    member private _.EnsureAuthenticated() : Task =
+        task {
+            // Call /login to get auth cookie - the handler's CookieContainer will store it
+            let! _ = client.GetAsync("/login")
+            ()
+        }
 
     // ============================================================================
     // User Story 1: Create and Play a New Game
@@ -43,8 +60,11 @@ type RestApiTests() =
         }
 
     [<Test>]
-    member _.``POST /games/{id} with valid move returns 202``() : Task =
+    member this.``POST /games/{id} with valid move returns 202``() : Task =
         task {
+            // Ensure we have an auth cookie
+            do! this.EnsureAuthenticated()
+
             // First create a game
             let! createResponse = client.PostAsync("/games", null)
             let gameUrl = createResponse.Headers.Location.ToString()
@@ -64,8 +84,11 @@ type RestApiTests() =
         }
 
     [<Test>]
-    member _.``POST /games/{id} on non-existent game returns 404``() : Task =
+    member this.``POST /games/{id} on non-existent game returns 404``() : Task =
         task {
+            // Ensure we have an auth cookie
+            do! this.EnsureAuthenticated()
+
             let signals = """{"gameId":"nonexistent","player":"X","position":"TopLeft"}"""
             let content = new StringContent(signals, Text.Encoding.UTF8, "application/json")
 
@@ -75,6 +98,29 @@ type RestApiTests() =
             let! response = client.SendAsync(request)
 
             Assert.That(int response.StatusCode, Is.EqualTo(404), "Should return 404 for non-existent game")
+        }
+
+    [<Test>]
+    member _.``POST /games/{id} without auth returns 401``() : Task =
+        task {
+            // First create a game with the authenticated client
+            let! createResponse = client.PostAsync("/games", null)
+            let gameUrl = createResponse.Headers.Location.ToString()
+            let gameId = gameUrl.Substring("/games/".Length)
+
+            // Now create a fresh client without cookies
+            use freshHandler = new HttpClientHandler(CookieContainer = CookieContainer())
+            use freshClient = new HttpClient(freshHandler, BaseAddress = Uri(baseUrl))
+
+            let signals = sprintf """{"gameId":"%s","player":"X","position":"TopLeft"}""" gameId
+            let content = new StringContent(signals, Text.Encoding.UTF8, "application/json")
+
+            use request = new HttpRequestMessage(HttpMethod.Post, gameUrl, Content = content)
+            request.Headers.Add("datastar-request", "true")
+
+            let! response = freshClient.SendAsync(request)
+
+            Assert.That(int response.StatusCode, Is.EqualTo(401), "Should return 401 without authentication")
         }
 
     // ============================================================================

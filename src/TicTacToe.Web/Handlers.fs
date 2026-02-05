@@ -2,6 +2,7 @@ module TicTacToe.Web.Handlers
 
 open System
 open System.Threading.Channels
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Authentication
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Http
@@ -21,6 +22,19 @@ type MoveSignals =
     { gameId: string
       player: string
       position: string }
+
+/// Helper to wrap handlers that require authentication.
+/// Checks for valid auth cookie and redirects to /login if not present.
+let requiresAuth (handler: HttpContext -> Task<unit>) (ctx: HttpContext) : Task<unit> =
+    task {
+        // Check if the user has a valid auth cookie (not just claims from transformation)
+        let! authResult = ctx.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme)
+        if authResult.Succeeded then
+            do! handler ctx
+        else
+            // Issue challenge - will redirect to /login due to LoginPath setting
+            do! ctx.ChallengeAsync()
+    }
 
 // Active game subscriptions - maps gameId to subscription disposable
 let private gameSubscriptions =
@@ -114,7 +128,7 @@ let logout (ctx: HttpContext) =
         ctx.Response.Redirect(returnUrl)
     }
 
-/// Home page handler
+/// Home page handler (use with requiresAuth wrapper)
 let home (ctx: HttpContext) =
     task {
         let html = templates.home.homePage ctx |> layout.html ctx |> Render.toString

@@ -73,15 +73,26 @@ type GamePlayTests() =
         task {
             do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
 
+            // Get game URL for second player
+            let gameBoard = this.Page.Locator(".game-board").First
+            let! gameId = gameBoard.GetAttributeAsync("id")
+            let gameIdValue = gameId.Substring("game-".Length)
+            let gameUrl = $"{this.BaseUrl}/games/{gameIdValue}"
+
+            // Create second player (O)
+            let! playerO = this.CreateSecondPlayer(gameUrl)
+            do! TestHelpers.waitForVisible playerO ".game-board" this.TimeoutMs
+
             // First move - should be X's turn
             do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
 
-            // Click first square
+            // X clicks first square
             do! this.Page.Locator(".square-clickable").First.ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
+            do! TestHelpers.waitForTextContains playerO ".status" "O's turn" this.TimeoutMs
 
-            // Click second square
-            do! this.Page.Locator(".square-clickable").First.ClickAsync()
+            // O clicks first available square
+            do! playerO.Locator(".square-clickable").First.ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
         }
 
@@ -94,28 +105,43 @@ type GamePlayTests() =
         task {
             do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
 
-            // X: TopLeft
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
+            // Get game URL for second player
+            let gameBoard = this.Page.Locator(".game-board").First
+            let! gameId = gameBoard.GetAttributeAsync("id")
+            let gameIdValue = gameId.Substring("game-".Length)
+            let gameUrl = $"{this.BaseUrl}/games/{gameIdValue}"
 
-            // O: MiddleLeft
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
+            // Create second player (O)
+            let! playerO = this.CreateSecondPlayer(gameUrl)
+            do! TestHelpers.waitForVisible playerO ".game-board" this.TimeoutMs
+
+            // X: TopLeft (index 0)
+            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
+            do! TestHelpers.waitForTextContains playerO ".status" "O's turn" this.TimeoutMs
+
+            // O: MiddleLeft (now index 2 after X took index 0)
+            do! playerO.Locator(".square-clickable").Nth(2).ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
 
-            // X: TopCenter
+            // X: TopCenter (now index 0 - first available)
             do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
+            do! TestHelpers.waitForTextContains playerO ".status" "O's turn" this.TimeoutMs
 
-            // O: MiddleCenter
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
+            // O: MiddleCenter (now index 2)
+            do! playerO.Locator(".square-clickable").Nth(2).ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
 
-            // X: TopRight - wins!
+            // X: TopRight - wins! (now index 0 - first available)
             do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "wins" this.TimeoutMs
 
-            let! statusText = this.Page.Locator(".status").TextContentAsync()
-            Assert.That(statusText, Does.Contain("X wins!"), "X should win")
+            // Verify both players see the win
+            let! statusTextX = this.Page.Locator(".status").TextContentAsync()
+            Assert.That(statusTextX, Does.Contain("X wins!"), "X player should see X wins")
+
+            do! TestHelpers.waitForTextContains playerO ".status" "wins" this.TimeoutMs
+            let! statusTextO = playerO.Locator(".status").TextContentAsync()
+            Assert.That(statusTextO, Does.Contain("X wins!"), "O player should see X wins")
         }
 
     [<Test>]
@@ -123,21 +149,44 @@ type GamePlayTests() =
         task {
             do! TestHelpers.waitForVisible this.Page ".square-clickable" this.TimeoutMs
 
-            // Play to X win
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "O's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(2).ClickAsync()
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
-            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
+            // Get game URL for second player
+            let gameBoard = this.Page.Locator(".game-board").First
+            let! gameId = gameBoard.GetAttributeAsync("id")
+            let gameIdValue = gameId.Substring("game-".Length)
+            let gameUrl = $"{this.BaseUrl}/games/{gameIdValue}"
 
+            // Create second player (O)
+            let! playerO = this.CreateSecondPlayer(gameUrl)
+            do! TestHelpers.waitForVisible playerO ".game-board" this.TimeoutMs
+
+            // Play to X win with two players
+            // X: TopLeft
+            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
+            do! TestHelpers.waitForTextContains playerO ".status" "O's turn" this.TimeoutMs
+
+            // O: MiddleLeft
+            do! playerO.Locator(".square-clickable").Nth(2).ClickAsync()
+            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
+
+            // X: TopCenter
+            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
+            do! TestHelpers.waitForTextContains playerO ".status" "O's turn" this.TimeoutMs
+
+            // O: MiddleCenter
+            do! playerO.Locator(".square-clickable").Nth(2).ClickAsync()
+            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
+
+            // X: TopRight - wins!
+            do! this.Page.Locator(".square-clickable").Nth(0).ClickAsync()
             do! TestHelpers.waitForTextContains this.Page ".status" "wins" this.TimeoutMs
 
-            let! clickableCount = this.Page.Locator(".square-clickable").CountAsync()
-            Assert.That(clickableCount, Is.EqualTo(0), "No squares should be clickable after game ends")
+            // Verify no squares are clickable for either player
+            let! clickableCountX = this.Page.Locator(".square-clickable").CountAsync()
+            Assert.That(clickableCountX, Is.EqualTo(0), "No squares should be clickable for X after game ends")
+
+            do! TestHelpers.waitForTextContains playerO ".status" "wins" this.TimeoutMs
+            let! clickableCountO = playerO.Locator(".square-clickable").CountAsync()
+            Assert.That(clickableCountO, Is.EqualTo(0), "No squares should be clickable for O after game ends")
         }
 
     // ============================================================================

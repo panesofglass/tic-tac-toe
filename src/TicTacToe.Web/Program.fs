@@ -31,7 +31,8 @@ let configureServices (services: IServiceCollection) =
             options.Cookie.SameSite <- SameSiteMode.Strict
             options.Cookie.SecurePolicy <- CookieSecurePolicy.SameAsRequest
             options.ExpireTimeSpan <- TimeSpan.FromDays(30.0)
-            options.SlidingExpiration <- true)
+            options.SlidingExpiration <- true
+            options.LoginPath <- "/login")
     |> ignore
 
     services
@@ -81,7 +82,7 @@ let debug =
 let home =
     resource "/" {
         name "Home"
-        get Handlers.home
+        get (Handlers.requiresAuth Handlers.home)
     }
 
 let sse =

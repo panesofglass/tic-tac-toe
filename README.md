@@ -1,12 +1,14 @@
 # Tic-Tac-Toe Web Application
 
-A web-based Tic-Tac-Toe game built with F# and ASP.NET Core.
+A multi-player web-based Tic-Tac-Toe game built with F# and ASP.NET Core, featuring real-time updates and concurrent game support.
 
 ## Features
 
-- Interactive Tic-Tac-Toe gameplay
-- Server-side event streaming
-- Responsive design
+- **Multi-player gameplay** - Two players (X and O) play from separate browsers
+- **Multiple concurrent games** - Create and manage multiple games on a single page
+- **Real-time updates** - Server-sent events (SSE) broadcast game state to all connected players
+- **Automatic authentication** - Cookie-based user identification without explicit sign-in
+- **Direct game URLs** - Share game links for others to join
 
 ## Getting Started
 
@@ -22,75 +24,105 @@ A web-based Tic-Tac-Toe game built with F# and ASP.NET Core.
 3. Run the application:
 
 ```bash
-dotnet run --project src/TicTacToe.Web/TicTacToe.Web.fsproj
+dotnet run --project src/TicTacToe.Web/
 ```
 
-4. Open your browser and navigate to `https://localhost:5001`
+4. Open your browser and navigate to `http://localhost:5228`
 
-## User Identification
+### Playing a Game
 
-The application includes an automatic user identification system that doesn't require explicit sign-in:
-
-### How It Works
-
-- Users receive a persistent cookie-based identifier on their first visit
-- The system uses claims-based identity through ASP.NET Core authentication
-- Each user gets a unique ID and timestamps for tracking game progress
-- Additional environmental information helps with device identification
-
-### Claims Used
-
-- `sub`: Unique user identifier (GUID)
-- `created_at`: When the user was first created
-- `last_visit`: When the user last visited
-- `ip_address`: User's IP address (for diagnostics)
-- `user_agent`: Browser information (for diagnostics)
-
-### Security Considerations
-
-- Cookies are configured as HttpOnly to prevent client-side script access
-- SameSite policy is set to Lax to balance security with functionality
-- Authentication is established before antiforgery checks
-- No sensitive personal information is stored
-
-### Accessing User Information
-
-To access the current user's identification in a request handler:
-
-```fsharp
-let userHandler (ctx: HttpContext) =
-    // Get the user ID
-    let userId = ctx.User.FindClaimValue(ClaimTypes.UserId)
-
-    // Get the created timestamp
-    let created = ctx.User.FindClaimValue(ClaimTypes.Created)
-
-    // Check if this is a returning user
-    let isReturningUser = ctx.User.HasClaim(ClaimTypes.Created)
-
-    // Use the TryGetUserId extension method
-    match ctx.User.TryGetUserId() with
-    | Some id -> // Use the ID
-    | None -> // Handle new user case
-```
+1. Visit the home page - you'll be automatically authenticated
+2. Click **New Game** to create a game board
+3. Share the game URL with another player (or open in a different browser)
+4. Take turns - X plays first, then O
+5. The first player to get three in a row wins!
 
 ## Architecture
 
-The application uses the following technologies:
+### Technologies
 
-- F# as the primary language
-- ASP.NET Core for the web framework
-- Frank.Builder for routing and HTTP handling
-- Oxpecker for view rendering
-- StarFederation.Datastar for server-sent events
+- **F#** - Primary language
+- **ASP.NET Core** - Web framework
+- **Frank 6.5.0** - Routing and HTTP handling
+- **Frank.Datastar** - Server-sent events integration
+- **Oxpecker.ViewEngine** - HTML view rendering
+- **Playwright** - End-to-end testing
+
+### Key Components
+
+- **GameSupervisor** - Manages multiple concurrent game instances
+- **PlayerAssignmentManager** - Tracks which user plays X or O in each game
+- **SSE Broadcast** - Real-time game state updates to all connected clients
+
+## Authentication
+
+The application uses automatic cookie-based authentication:
+
+### Flow
+
+1. Unauthenticated users visiting the home page are redirected to `/login`
+2. The login endpoint creates a persistent cookie with a unique user ID
+3. Users are redirected back to their original destination
+4. Subsequent requests include the cookie for identification
+
+### Multi-Player Validation
+
+- First player to move in a game is assigned as X
+- Second player (different user) is assigned as O
+- Players can only move on their turn
+- Same user cannot play both sides
+
+### Claims
+
+- `sub` - Unique user identifier (GUID)
+- `created_at` - Account creation timestamp
+- `last_visit` - Last activity timestamp
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Home page (requires auth) |
+| GET | `/login` | Authenticate and get cookie |
+| GET | `/logout` | Clear authentication |
+| GET | `/sse` | SSE stream for real-time updates |
+| POST | `/games` | Create a new game |
+| GET | `/games/{id}` | View a specific game |
+| POST | `/games/{id}` | Make a move |
+| DELETE | `/games/{id}` | Delete a game |
 
 ## Testing
 
-Run the tests using:
+### Run All Tests
 
 ```bash
 dotnet test
 ```
+
+### Run with Server
+
+The Playwright tests require the server to be running:
+
+```bash
+# Terminal 1: Start the server
+dotnet run --project src/TicTacToe.Web/
+
+# Terminal 2: Run tests
+TEST_BASE_URL="http://localhost:5228" dotnet test
+```
+
+### Test Categories
+
+- **HomePageTests** - Basic page loading and navigation
+- **GamePlayTests** - Game mechanics, turns, win conditions (uses two browser contexts for multi-player)
+- **MultiGameTests** - Concurrent game management
+- **RestApiTests** - API endpoint validation
+
+## CI/CD
+
+GitHub Actions runs on every push and pull request:
+- Build validation
+- All tests (unit + Playwright)
 
 ## License
 

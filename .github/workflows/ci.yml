@@ -21,6 +21,14 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: 'preview'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.fsproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -30,8 +38,25 @@ jobs:
       - name: Run unit tests
         run: dotnet test test/TicTacToe.Engine.Tests/ --no-build --verbosity normal
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: |
+          PLAYWRIGHT_VERSION=$(grep 'Microsoft.Playwright' test/TicTacToe.Web.Tests/TicTacToe.Web.Tests.fsproj | sed -n 's/.*Version="\([^"]*\)".*/\1/p')
+          echo "version=$PLAYWRIGHT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
-        run: pwsh test/TicTacToe.Web.Tests/bin/Debug/net10.0/playwright.ps1 install chromium --with-deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pwsh test/TicTacToe.Web.Tests/bin/Debug/net10.0/playwright.ps1 install chromium
+
+      - name: Install Playwright system dependencies
+        run: pwsh test/TicTacToe.Web.Tests/bin/Debug/net10.0/playwright.ps1 install-deps chromium
 
       - name: Start web application
         run: |

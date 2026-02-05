@@ -20,7 +20,8 @@ type MultiGameTests() =
     member private this.CleanupGames() : Task =
         task {
             let! count = this.Page.Locator(".delete-game-btn").CountAsync()
-            for _ in 1 .. count do
+
+            for _ in 1..count do
                 do! this.Page.Locator(".delete-game-btn").First.ClickAsync()
                 do! Task.Delay(100) // Small delay to allow SSE update
         }
@@ -86,20 +87,20 @@ type MultiGameTests() =
     member this.``Ten concurrent games remain responsive``() : Task =
         task {
             // Create 10 games
-            for _ in 1 .. 10 do
+            for _ in 1..10 do
                 do! this.CreateGame()
 
             do! TestHelpers.waitForCount this.Page ".game-board" 10 this.TimeoutMs
 
             // Make a move in each game
-            for i in 0 .. 9 do
+            for i in 0..9 do
                 let game = this.Page.Locator(".game-board").Nth(i)
                 do! game.Locator(".square-clickable").First.ClickAsync()
                 // Small delay to allow SSE update
                 do! Task.Delay(50)
 
             // Verify each game has exactly one X
-            for i in 0 .. 9 do
+            for i in 0..9 do
                 let game = this.Page.Locator(".game-board").Nth(i)
                 let! playerCount = game.Locator(".player").CountAsync()
                 Assert.That(playerCount, Is.EqualTo(1), $"Game {i + 1} should have exactly one move")
@@ -168,7 +169,10 @@ type MultiGameTests() =
             let gameIdValue = gameId.Substring("game-".Length)
 
             // Delete via API (simulating another client)
-            do! this.Page.EvaluateAsync($"() => fetch('/games/{gameIdValue}', {{ method: 'DELETE' }})") |> Async.AwaitTask |> Async.Ignore
+            do!
+                this.Page.EvaluateAsync($"() => fetch('/games/{gameIdValue}', {{ method: 'DELETE' }})")
+                |> Async.AwaitTask
+                |> Async.Ignore
 
             // Wait for removal
             do! TestHelpers.waitForCount this.Page ".game-board" 0 this.TimeoutMs

@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="PlayerAssignmentTests.fs" />
     <Compile Include="GameBoardTests.fs" />
     <Compile Include="AuthTests.fs" />
     <Compile Include="TestHelpers.fs" />
@@ -15,6 +16,7 @@
     <Compile Include="GamePlayTests.fs" />
     <Compile Include="RestApiTests.fs" />
     <Compile Include="MultiGameTests.fs" />
+    <Compile Include="MultiPlayerTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

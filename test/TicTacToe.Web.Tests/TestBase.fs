@@ -29,10 +29,34 @@ type TestBase() =
             | _ -> None)
         |> Option.defaultValue 5000
 
+    // Track additional contexts for cleanup
+    let mutable additionalContexts: IBrowserContext list = []
+
     member _.Page = page
     member _.Context = context
+    member _.Browser = browser
     member _.BaseUrl = baseUrl
     member _.TimeoutMs = timeoutMs
+
+    /// Creates a new authenticated page (separate user) for multi-player tests.
+    /// The page navigates to /login to get its own auth cookie, then to the specified URL.
+    member this.CreateSecondPlayer(gameUrl: string) : Task<IPage> =
+        task {
+            // Create new context (separate cookie jar = separate user)
+            let! ctx = browser.NewContextAsync()
+            additionalContexts <- ctx :: additionalContexts
+
+            let! newPage = ctx.NewPageAsync()
+
+            // Authenticate by visiting /login
+            let options = PageGotoOptions(Timeout = Nullable(float32 timeoutMs))
+            let! _ = newPage.GotoAsync($"{baseUrl}/login", options)
+
+            // Navigate to the game
+            let! _ = newPage.GotoAsync(gameUrl, options)
+
+            return newPage
+        }
 
     [<OneTimeSetUp>]
     member _.SetupBrowser() : Task =
@@ -74,6 +98,11 @@ type TestBase() =
     [<TearDown>]
     member _.TeardownPage() : Task =
         task {
+            // Close additional contexts first
+            for ctx in additionalContexts do
+                do! ctx.CloseAsync()
+            additionalContexts <- []
+
             if not (isNull page) then
                 do! page.CloseAsync()
                 page <- null

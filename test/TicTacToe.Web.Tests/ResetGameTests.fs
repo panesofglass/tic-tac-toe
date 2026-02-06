@@ -99,33 +99,37 @@ type ResetGameTests() =
     [<Test>]
     member this.``Reset broadcasts to all connected clients``() : Task =
         task {
-            // Wait for 6 initial games
+            // Wait for initial games
             do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
 
             let game = this.Page.Locator(".game-board").First
-            let! gameId = game.GetAttributeAsync("id")
-            let gameIdValue = gameId.Substring("game-".Length)
 
             // Make a move
             do! this.MakeMove(game)
             do! game.Locator(".player").First.WaitForAsync()
 
-            // Open second browser as different user (becomes Player O when they navigate to the game)
-            let! player2Page = this.CreateSecondPlayer($"{this.BaseUrl}/games/{gameIdValue}")
+            // Open second browser on home page (separate SSE connection sees all games)
+            let! player2Page = this.CreateSecondPlayer(this.BaseUrl)
             do! TestHelpers.waitForVisible player2Page ".game-board" this.TimeoutMs
 
-            // Wait for reset button to become enabled
+            // Record Player 2's game count before reset
+            let! p2CountBefore = player2Page.Locator(".game-board").CountAsync()
+
+            // Wait for reset button to become enabled on Player 1's page
             do! game.Locator(".reset-game-btn:not([disabled])").WaitForAsync()
 
             // Player 1 clicks Reset
             do! game.Locator(".reset-game-btn").ClickAsync()
             do! Task.Delay(500)
 
-            // Verify Player 2 sees the old game was removed (the specific game ID should be gone)
-            // The new game (replacement) should have no moves
-            let newGame = player2Page.Locator(".game-board").Last
-            let! newGamePlayers = newGame.Locator(".player").CountAsync()
-            Assert.That(newGamePlayers, Is.EqualTo(0), "New game after reset should have no moves")
+            // Verify Player 2 still has the same number of games (old removed, new appended)
+            let! p2CountAfter = player2Page.Locator(".game-board").CountAsync()
+            Assert.That(p2CountAfter, Is.EqualTo(p2CountBefore), "Player 2 game count should remain the same after reset")
+
+            // The new game (replacement, appended last) should have no moves
+            let lastGame = player2Page.Locator(".game-board").Last
+            let! lastGamePlayers = lastGame.Locator(".player").CountAsync()
+            Assert.That(lastGamePlayers, Is.EqualTo(0), "New game after reset should have no moves on Player 2's page")
         }
 
     // ============================================================================

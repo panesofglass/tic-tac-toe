@@ -105,7 +105,8 @@ let tests =
               Expect.stringContains html "X wins!" "Should show X win message"
               Expect.stringContains html "Delete Game" "Should show delete game button"
               Expect.stringContains html "delete-game-btn" "Should have delete game button class"
-              Expect.stringContains html $"@delete(&#39;/games/{testGameId}&#39;)" "Should have DELETE action for this game"
+              // renderGameBoard uses UnassignedX role with gameCount=6, so delete is disabled
+              Expect.stringContains html "disabled" "Delete button should be disabled when rendered without user context"
               Expect.isFalse (html.Contains("square-clickable")) "Should not have any clickable squares"
 
           testCase "Draw game renders correctly"

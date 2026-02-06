@@ -157,7 +157,7 @@ let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) =
                 renderSquare gameId gameState validMoves currentPlayer position
         }
 
-        // Game controls - Reset button enabled if activity, Delete always disabled (need context)
+        // Game controls - Reset and Delete buttons enabled if activity (server validates authorization)
         div(class' = "controls") {
             if hasActivity then
                 button(class' = "reset-game-btn", type' = "button")
@@ -169,11 +169,16 @@ let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) =
                     .attr("disabled", "disabled") {
                     "Reset Game"
                 }
-            // Delete button always disabled in broadcast (no game count context)
-            button(class' = "delete-game-btn", type' = "button")
-                .attr("disabled", "disabled") {
-                "Delete Game"
-            }
+            if hasActivity then
+                button(class' = "delete-game-btn", type' = "button")
+                    .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) {
+                    "Delete Game"
+                }
+            else
+                button(class' = "delete-game-btn", type' = "button")
+                    .attr("disabled", "disabled") {
+                    "Delete Game"
+                }
         }
     }
 

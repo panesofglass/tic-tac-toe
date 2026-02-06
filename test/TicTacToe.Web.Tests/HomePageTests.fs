@@ -71,8 +71,9 @@ type HomePageTests() =
     [<Test>]
     member this.``Empty board has 9 clickable squares``() : Task =
         task {
-            // Check the first initial game
-            let game = this.Page.Locator(".game-board").First
+            // Create a fresh game to avoid interference from prior tests
+            do! this.CreateGame()
+            let game = this.Page.Locator(".game-board").Last
             let! clickableSquares = game.Locator(".square-clickable").CountAsync()
             Assert.That(clickableSquares, Is.EqualTo(9), "Empty board should have 9 clickable squares")
         }

@@ -163,10 +163,10 @@ test/TicTacToe.Web.Tests/    # Playwright integration tests
 
 **Purpose**: Final verification and cleanup
 
-- [ ] T036 [P] Run all Playwright tests to verify all user stories work together
-- [ ] T037 [P] Verify SSE broadcasts work correctly for multi-client scenarios
+- [X] T036 [P] Run all Playwright tests to verify all user stories work together
+- [X] T037 [P] Verify SSE broadcasts work correctly for multi-client scenarios
 - [ ] T038 Run quickstart.md verification steps manually
-- [ ] T039 Update existing tests in `test/TicTacToe.Web.Tests/MultiGameTests.fs` if any break due to new behavior; verify FR-011 (New Game button remains functional for creating games beyond initial six)
+- [X] T039 Update existing tests in `test/TicTacToe.Web.Tests/MultiGameTests.fs` if any break due to new behavior; verify FR-011 (New Game button remains functional for creating games beyond initial six)
 
 ---
 

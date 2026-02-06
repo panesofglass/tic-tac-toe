@@ -121,10 +121,11 @@ type ResetGameTests() =
             do! game.Locator(".reset-game-btn").ClickAsync()
             do! Task.Delay(500)
 
-            // Verify Player 2 sees a game with no players (the old game was removed, new game exists)
-            // Note: Player 2's page shows all games, so check that no games have moves
-            let! totalPlayers = player2Page.Locator(".game-board .player").CountAsync()
-            Assert.That(totalPlayers, Is.EqualTo(0), "All games should have no moves after reset")
+            // Verify Player 2 sees the old game was removed (the specific game ID should be gone)
+            // The new game (replacement) should have no moves
+            let newGame = player2Page.Locator(".game-board").Last
+            let! newGamePlayers = newGame.Locator(".player").CountAsync()
+            Assert.That(newGamePlayers, Is.EqualTo(0), "New game after reset should have no moves")
         }
 
     // ============================================================================

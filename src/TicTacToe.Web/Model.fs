@@ -141,15 +141,15 @@ type PlayerAssignmentManager() =
 
     /// Get the role of a user in a game
     member _.GetRole(gameId: string, userId: string) =
-        agent.PostAndAsyncReply(fun reply -> GetRole(gameId, userId, reply))
+        agent.PostAndReply(fun reply -> GetRole(gameId, userId, reply))
 
     /// Try to assign a player and validate the move
     member _.TryAssignAndValidate(gameId: string, userId: string, isXTurn: bool) =
-        agent.PostAndAsyncReply(fun reply -> TryAssignAndValidate(gameId, userId, isXTurn, reply))
+        agent.PostAndReply(fun reply -> TryAssignAndValidate(gameId, userId, isXTurn, reply))
 
     /// Remove a game's player assignments (when game is deleted)
     member _.RemoveGame(gameId: string) = agent.Post(RemoveGame gameId)
 
-    /// Get the current assignment for a game (for testing/debugging)
+    /// Get the current assignment for a game
     member _.GetAssignment(gameId: string) =
-        agent.PostAndAsyncReply(fun reply -> GetAssignment(gameId, reply))
+        agent.PostAndReply(fun reply -> GetAssignment(gameId, reply))

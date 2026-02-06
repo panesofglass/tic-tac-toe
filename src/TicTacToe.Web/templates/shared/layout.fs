@@ -2,11 +2,28 @@ namespace TicTacToe.Web.templates.shared
 
 open Microsoft.AspNetCore.Http
 open Oxpecker.ViewEngine
+open TicTacToe.Web
 
 #nowarn "3391"
 
 module layout =
-    let mainLayout (ctx: HttpContext) (content: HtmlElement) = main () { content }
+    let mainLayout (ctx: HttpContext) (content: HtmlElement) =
+        let userIdOpt =
+            if not (isNull ctx.User) then
+                ctx.User.TryGetUserId()
+            else
+                None
+
+        Fragment() {
+            match userIdOpt with
+            | Some userId ->
+                header (class' = "page-header") {
+                    span (class' = "user-identity") { userId.[..7] }
+                }
+            | None -> ()
+
+            main () { content }
+        }
 
     let html (ctx: HttpContext) (content: HtmlElement) =
         html (lang = "en") {

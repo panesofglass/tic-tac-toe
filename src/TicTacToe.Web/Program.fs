@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.ResponseCompression
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Frank.Builder
 open Frank.Datastar
@@ -105,6 +106,25 @@ let gameById =
         delete Handlers.deleteGame
     }
 
+let gameReset =
+    resource "/games/{id}/reset" {
+        name "GameReset"
+        post (Handlers.requiresAuth Handlers.resetGame)
+    }
+
+/// Create initial games on application startup
+let createInitialGames (app: IApplicationBuilder) =
+    let lifetime = app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
+    let supervisor = app.ApplicationServices.GetRequiredService<GameSupervisor>()
+
+    lifetime.ApplicationStarted.Register(fun () ->
+        // Create 6 initial games
+        for _ in 1..6 do
+            let (gameId, game) = supervisor.CreateGame()
+            Handlers.subscribeToGame gameId game
+    ) |> ignore
+    app
+
 [<EntryPoint>]
 let main args =
     webHost args {
@@ -125,6 +145,7 @@ let main args =
         plugBeforeRouting AuthAppBuilderExtensions.UseAuthentication
         plugBeforeRouting AuthorizationAppBuilderExtensions.UseAuthorization
         plugBeforeRouting AntiforgeryApplicationBuilderExtensions.UseAntiforgery
+        plugBeforeRouting createInitialGames
 
         resource login
         resource logout
@@ -133,6 +154,7 @@ let main args =
         resource sse
         resource games
         resource gameById
+        resource gameReset
     }
 
     0

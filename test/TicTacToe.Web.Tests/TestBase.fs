@@ -88,6 +88,9 @@ type TestBase() =
 
             try
                 let options = PageGotoOptions(Timeout = Nullable(float32 timeoutMs))
+                // First visit /login to get an auth cookie (home requires auth)
+                let! _ = page.GotoAsync($"{baseUrl}/login", options)
+                // Now navigate to home - should work with auth cookie
                 let! _ = page.GotoAsync(baseUrl, options)
                 ()
             with ex ->

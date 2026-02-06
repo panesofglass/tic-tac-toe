@@ -2,6 +2,7 @@ module TicTacToe.Web.templates.game
 
 open Oxpecker.ViewEngine
 open TicTacToe.Model
+open TicTacToe.Web.Model
 
 let private allPositions =
     [ TopLeft
@@ -21,6 +22,30 @@ let private getSquareValue (gameState: GameState) (position: SquarePosition) : s
 
 let private isValidMove (validMoves: SquarePosition array) (position: SquarePosition) : bool =
     validMoves |> Array.contains position
+
+/// Check if game has any moves or assigned players
+let hasMovesOrPlayers (result: MoveResult) (assignment: PlayerAssignment option) =
+    match result with
+    | XTurn(state, _) ->
+        // Check if board has any moves (any Taken squares) or if players assigned
+        let hasMoves = state.Values |> Seq.exists (function Taken _ -> true | Empty -> false)
+        let hasPlayers = assignment.IsSome && (assignment.Value.PlayerXId.IsSome || assignment.Value.PlayerOId.IsSome)
+        hasMoves || hasPlayers
+    | OTurn _ | Won _ | Draw _ | Error _ -> true  // Always has activity
+
+/// Check if user can reset the game
+let canReset hasActivity role =
+    hasActivity &&
+    match role with
+    | PlayerX | PlayerO -> true
+    | Spectator | UnassignedX | UnassignedO -> false
+
+/// Check if user can delete the game
+let canDelete gameCount role =
+    gameCount > 6 &&
+    match role with
+    | PlayerX | PlayerO -> true
+    | Spectator | UnassignedX | UnassignedO -> false
 
 let private renderSquare
     (gameId: string)
@@ -53,8 +78,8 @@ let private renderSquare
         }
         :> HtmlElement
 
-/// Render the current game state from a MoveResult with game ID for multi-game support
-let renderGameBoard (gameId: string) (result: MoveResult) =
+/// Render with full context for button enable/disable logic
+let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: PlayerRole) (assignment: PlayerAssignment option) (gameCount: int) =
     let (gameState, currentPlayer, validMoves, status) =
         match result with
         | XTurn(state, moves) -> (state, Some X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
@@ -64,6 +89,9 @@ let renderGameBoard (gameId: string) (result: MoveResult) =
         | Error(state, msg) -> (state, None, [||], $"Error: {msg}")
 
     let isGameOver = currentPlayer.IsNone
+    let hasActivity = hasMovesOrPlayers result assignment
+    let resetEnabled = canReset hasActivity userRole
+    let deleteEnabled = canDelete gameCount userRole
 
     div(id = $"game-{gameId}", class' = "game-board")
         .attr("data-signals", sprintf "{gameId: '%s', player: '', position: ''}" gameId) {
@@ -76,14 +104,88 @@ let renderGameBoard (gameId: string) (result: MoveResult) =
                 renderSquare gameId gameState validMoves currentPlayer position
         }
 
-        // Game controls - Delete button for cleanup
+        // Game controls - Reset and Delete buttons
         div(class' = "controls") {
-            button(class' = "delete-game-btn", type' = "button")
-                .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) {
-                "Delete Game"
-            }
+            if resetEnabled then
+                button(class' = "reset-game-btn", type' = "button")
+                    .attr("data-on:click", sprintf "@post('/games/%s/reset')" gameId) {
+                    "Reset Game"
+                }
+            else
+                button(class' = "reset-game-btn", type' = "button")
+                    .attr("disabled", "disabled") {
+                    "Reset Game"
+                }
+            if deleteEnabled then
+                button(class' = "delete-game-btn", type' = "button")
+                    .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) {
+                    "Delete Game"
+                }
+            else
+                button(class' = "delete-game-btn", type' = "button")
+                    .attr("disabled", "disabled") {
+                    "Delete Game"
+                }
         }
     }
+
+/// Render game board for SSE broadcast (minimal context - server validates actions)
+/// Uses simplified enable logic: reset enabled if game has activity, delete always disabled
+let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) =
+    let (gameState, currentPlayer, validMoves, status) =
+        match result with
+        | XTurn(state, moves) -> (state, Some X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
+        | OTurn(state, moves) -> (state, Some O, moves |> Array.map (fun (OPos pos) -> pos), "O's turn")
+        | Won(state, player) -> (state, None, [||], $"{player} wins!")
+        | Draw state -> (state, None, [||], "It's a draw!")
+        | Error(state, msg) -> (state, None, [||], $"Error: {msg}")
+
+    // For broadcast: enable reset if game has any activity (server validates authorization)
+    let hasActivity =
+        match result with
+        | XTurn(state, _) -> state.Values |> Seq.exists (function Taken _ -> true | Empty -> false)
+        | _ -> true
+
+    div(id = $"game-{gameId}", class' = "game-board")
+        .attr("data-signals", sprintf "{gameId: '%s', player: '', position: ''}" gameId) {
+        // Game status
+        div(class' = "status") { h2() { status } }
+
+        // Game board - 3x3 grid
+        div(class' = "board") {
+            for position in allPositions do
+                renderSquare gameId gameState validMoves currentPlayer position
+        }
+
+        // Game controls - Reset and Delete buttons enabled if activity (server validates authorization)
+        div(class' = "controls") {
+            if hasActivity then
+                button(class' = "reset-game-btn", type' = "button")
+                    .attr("data-on:click", sprintf "@post('/games/%s/reset')" gameId) {
+                    "Reset Game"
+                }
+            else
+                button(class' = "reset-game-btn", type' = "button")
+                    .attr("disabled", "disabled") {
+                    "Reset Game"
+                }
+            if hasActivity then
+                button(class' = "delete-game-btn", type' = "button")
+                    .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) {
+                    "Delete Game"
+                }
+            else
+                button(class' = "delete-game-btn", type' = "button")
+                    .attr("disabled", "disabled") {
+                    "Delete Game"
+                }
+        }
+    }
+
+/// Render the current game state from a MoveResult with game ID for multi-game support
+/// Original signature maintained for backward compatibility
+let renderGameBoard (gameId: string) (result: MoveResult) =
+    renderGameBoardWithContext gameId result UnassignedX None 6
 
 /// CSS styles for the game board
 let gameStyles =
@@ -199,6 +301,28 @@ let gameStyles =
             background-color: #45a049;
         }
 
+        .reset-game-btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-right: 8px;
+        }
+
+        .reset-game-btn:hover:not(:disabled) {
+            background-color: #1976D2;
+        }
+
+        .reset-game-btn:disabled {
+            background-color: #90CAF9;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
         .delete-game-btn {
             background-color: #f44336;
             color: white;
@@ -210,8 +334,14 @@ let gameStyles =
             transition: background-color 0.2s;
         }
 
-        .delete-game-btn:hover {
+        .delete-game-btn:hover:not(:disabled) {
             background-color: #d32f2f;
+        }
+
+        .delete-game-btn:disabled {
+            background-color: #EF9A9A;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
 
         .loading {

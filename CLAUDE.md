@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2026-02-02
 
 ## Active Technologies
+- In-memory via MailboxProcessor (GameSupervisor pattern) (006-game-reset)
 
 - F# targeting .NET 10.0 + Frank 6.4.0, Frank.Datastar 6.4.0, Oxpecker.ViewEngine 1.1.0, System.Reactive 6.0.2 (002-multi-game-rest-api)
 - In-memory via MailboxProcessor (existing GameSupervisor pattern) (002-multi-game-rest-api)
@@ -26,10 +27,10 @@ tests/
 F# targeting .NET 10.0 (per existing project): Follow standard conventions
 
 ## Recent Changes
+- 006-game-reset: Added F# targeting .NET 10.0 + Frank 6.4.0, Frank.Datastar 6.4.0, Oxpecker.ViewEngine 1.1.0
 
 - 005-multi-player: Added F# targeting .NET 10.0 + Frank 6.4.0, Frank.Datastar 6.4.0, Oxpecker.ViewEngine 1.1.0
 - 004-github-actions-ci: Added F# targeting .NET 10.0 + GitHub Actions, `actions/checkout`, `actions/setup-dotnet`, `actions/upload-artifact`
-- 002-multi-game-rest-api: Added F# targeting .NET 10.0 + Frank 6.4.0, Frank.Datastar 6.4.0, Oxpecker.ViewEngine 1.1.0, System.Reactive 6.0.2
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

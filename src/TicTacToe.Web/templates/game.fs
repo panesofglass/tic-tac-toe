@@ -23,6 +23,15 @@ let private getSquareValue (gameState: GameState) (position: SquarePosition) : s
 let private isValidMove (validMoves: SquarePosition array) (position: SquarePosition) : bool =
     validMoves |> Array.contains position
 
+/// Parameters for rendering a single square
+type private SquareRenderContext =
+    { gameId: string
+      gameState: GameState
+      validMoves: SquarePosition array
+      currentPlayer: Player option
+      viewerRole: PlayerRole
+      assignment: PlayerAssignment option }
+
 /// Display first 8 characters of a user ID, or a placeholder if not assigned
 let shortUserId (id: string option) (placeholder: string) =
     id |> Option.map (fun s -> s.[..7]) |> Option.defaultValue placeholder
@@ -62,38 +71,30 @@ let renderLegend (assignment: PlayerAssignment option) (currentPlayer: Player op
         span(class' = oClass) { $"O: {oLabel}" }
     }
 
-let private renderSquare
-    (gameId: string)
-    (gameState: GameState)
-    (validMoves: SquarePosition array)
-    (currentPlayer: Player option)
-    (viewerRole: PlayerRole)
-    (assignment: PlayerAssignment option)
-    (position: SquarePosition)
-    =
-    let value = getSquareValue gameState position
+let private renderSquare (ctx: SquareRenderContext) (position: SquarePosition) =
+    let value = getSquareValue ctx.gameState position
     let positionStr = position.ToString()
     let isEmpty = System.String.IsNullOrEmpty(value)
-    let canMove = isEmpty && isValidMove validMoves position
+    let canMove = isEmpty && isValidMove ctx.validMoves position
 
     // Check if viewer can make a move:
     // 1. If viewer is the current player, they can move
     // 2. If game is unassigned (new game), unassigned players can make the first move
     let isViewerCurrentPlayer =
-        match (viewerRole, currentPlayer) with
+        match (ctx.viewerRole, ctx.currentPlayer) with
         | (PlayerX, Some X) | (PlayerO, Some O) -> true
         | _ -> false
 
     let isGameUnassigned =
-        match assignment with
+        match ctx.assignment with
         | None -> true
         | Some a -> a.PlayerXId.IsNone && a.PlayerOId.IsNone
 
     if canMove && (isViewerCurrentPlayer || isGameUnassigned) then
-        let playerStr = currentPlayer.Value.ToString()
+        let playerStr = ctx.currentPlayer.Value.ToString()
         // Clickable button - sets signals in click handler then posts to game-specific endpoint
         button(class' = "square square-clickable", type' = "button")
-            .attr("data-on:click", sprintf "$gameId = '%s'; $player = '%s'; $position = '%s'; @post('/games/%s')" gameId playerStr positionStr gameId) {
+            .attr("data-on:click", sprintf "$gameId = '%s'; $player = '%s'; $position = '%s'; @post('/games/%s')" ctx.gameId playerStr positionStr ctx.gameId) {
             // Show preview of move on hover
             span(class' = "preview") { playerStr }
         }
@@ -130,8 +131,9 @@ let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: 
 
         // Game board - 3x3 grid
         div(class' = "board") {
+            let ctx = { gameId = gameId; gameState = gameState; validMoves = validMoves; currentPlayer = currentPlayer; viewerRole = userRole; assignment = assignment }
             for position in allPositions do
-                renderSquare gameId gameState validMoves currentPlayer userRole assignment position
+                renderSquare ctx position
         }
 
         // Player legend
@@ -186,9 +188,9 @@ let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) (assignmen
 
         // Game board - 3x3 grid
         div(class' = "board") {
+            let ctx = { gameId = gameId; gameState = gameState; validMoves = validMoves; currentPlayer = currentPlayer; viewerRole = Spectator; assignment = assignment }
             for position in allPositions do
-                // For broadcast, use Spectator role (will show clickable for unassigned games)
-                renderSquare gameId gameState validMoves currentPlayer Spectator assignment position
+                renderSquare ctx position
         }
 
         // Player legend

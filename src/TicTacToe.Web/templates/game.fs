@@ -67,6 +67,8 @@ let private renderSquare
     (gameState: GameState)
     (validMoves: SquarePosition array)
     (currentPlayer: Player option)
+    (viewerRole: PlayerRole)
+    (assignment: PlayerAssignment option)
     (position: SquarePosition)
     =
     let value = getSquareValue gameState position
@@ -74,7 +76,20 @@ let private renderSquare
     let isEmpty = System.String.IsNullOrEmpty(value)
     let canMove = isEmpty && isValidMove validMoves position
 
-    if canMove && currentPlayer.IsSome then
+    // Check if viewer can make a move:
+    // 1. If viewer is the current player, they can move
+    // 2. If game is unassigned (new game), unassigned players can make the first move
+    let isViewerCurrentPlayer =
+        match (viewerRole, currentPlayer) with
+        | (PlayerX, Some X) | (PlayerO, Some O) -> true
+        | _ -> false
+
+    let isGameUnassigned =
+        match assignment with
+        | None -> true
+        | Some a -> a.PlayerXId.IsNone && a.PlayerOId.IsNone
+
+    if canMove && (isViewerCurrentPlayer || isGameUnassigned) then
         let playerStr = currentPlayer.Value.ToString()
         // Clickable button - sets signals in click handler then posts to game-specific endpoint
         button(class' = "square square-clickable", type' = "button")
@@ -116,7 +131,7 @@ let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: 
         // Game board - 3x3 grid
         div(class' = "board") {
             for position in allPositions do
-                renderSquare gameId gameState validMoves currentPlayer position
+                renderSquare gameId gameState validMoves currentPlayer userRole assignment position
         }
 
         // Player legend
@@ -172,7 +187,8 @@ let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) (assignmen
         // Game board - 3x3 grid
         div(class' = "board") {
             for position in allPositions do
-                renderSquare gameId gameState validMoves currentPlayer position
+                // For broadcast, use Spectator role (will show clickable for unassigned games)
+                renderSquare gameId gameState validMoves currentPlayer Spectator assignment position
         }
 
         // Player legend

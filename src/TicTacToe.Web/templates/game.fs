@@ -38,18 +38,18 @@ let hasMovesOrPlayers (result: MoveResult) (assignment: PlayerAssignment option)
     | OTurn _ | Won _ | Draw _ | Error _ -> true  // Always has activity
 
 /// Check if user can reset the game
-let canReset hasActivity role =
-    hasActivity &&
+/// Assigned players can always reset; all authenticated users can reset when gameCount > 6
+let canReset hasActivity gameCount role =
     match role with
-    | PlayerX | PlayerO -> true
-    | Spectator | UnassignedX | UnassignedO -> false
+    | PlayerX | PlayerO -> hasActivity  // Assigned players always see reset if game has activity
+    | Spectator | UnassignedX | UnassignedO -> gameCount > 6  // Non-assigned see reset when > 6 boards
 
 /// Check if user can delete the game
+/// Assigned players can always delete; all authenticated users can delete when gameCount > 6
 let canDelete gameCount role =
-    gameCount > 6 &&
     match role with
-    | PlayerX | PlayerO -> true
-    | Spectator | UnassignedX | UnassignedO -> false
+    | PlayerX | PlayerO -> gameCount > 6  // Assigned players can delete when > 6
+    | Spectator | UnassignedX | UnassignedO -> gameCount > 6  // Non-assigned can delete when > 6
 
 /// Render the player legend showing X and O assignments
 let renderLegend (assignment: PlayerAssignment option) (currentPlayer: Player option) =
@@ -105,7 +105,7 @@ let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: 
 
     let isGameOver = currentPlayer.IsNone
     let hasActivity = hasMovesOrPlayers result assignment
-    let resetEnabled = canReset hasActivity userRole
+    let resetEnabled = canReset hasActivity gameCount userRole
     let deleteEnabled = canDelete gameCount userRole
 
     div(id = $"game-{gameId}", class' = "game-board")

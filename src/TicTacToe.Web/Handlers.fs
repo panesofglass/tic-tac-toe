@@ -42,16 +42,20 @@ let private gameSubscriptions =
     System.Collections.Concurrent.ConcurrentDictionary<string, IDisposable>()
 
 /// Subscribe to a game's state changes and broadcast updates
-let subscribeToGame (gameId: string) (game: Game) (assignmentManager: PlayerAssignmentManager) =
+let subscribeToGame (gameId: string) (game: Game) (assignmentManager: PlayerAssignmentManager) (supervisor: GameSupervisor) =
     if not (gameSubscriptions.ContainsKey(gameId)) then
         let subscription =
             game.Subscribe(
                 { new IObserver<MoveResult> with
                     member _.OnNext(result) =
-                        // Use broadcast-specific rendering (no user context)
+                        // Render per-role and broadcast to each subscriber based on their role
                         let assignment = assignmentManager.GetAssignment(gameId)
-                        let html = renderGameBoardForBroadcast gameId result assignment |> Render.toString
-                        broadcast (PatchElements html)
+                        let gameCount = supervisor.GetActiveGameCount()
+                        let renderForRole userId =
+                            let role = assignmentManager.GetRole(gameId, userId)
+                            let html = renderGameBoardWithContext gameId result role assignment gameCount |> Render.toString
+                            PatchElements html
+                        broadcastPerRole renderForRole
 
                     member _.OnError(_) = ()
 
@@ -142,7 +146,8 @@ let home (ctx: HttpContext) =
 /// SSE endpoint - sends game state updates to all connected clients
 let sse (ctx: HttpContext) =
     task {
-        let myChannel = subscribe ()
+        let userId = ctx.User.TryGetUserId() |> Option.defaultValue "anonymous"
+        let myChannel = subscribe userId
         let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
         let assignmentManager = ctx.RequestServices.GetRequiredService<PlayerAssignmentManager>()
 
@@ -150,14 +155,16 @@ let sse (ctx: HttpContext) =
             // Clear loading state when client connects
             do! Datastar.patchElements """<div id="games-container" class="games-container"></div>""" ctx
 
-            // Send all existing games to the connecting client by iterating through subscriptions
+            // Send all existing games to the connecting client, personalized to their role
+            let gameCount = supervisor.GetActiveGameCount()
             for gameId in gameSubscriptions.Keys do
                 match supervisor.GetGame(gameId) with
                 | Some game ->
-                    // Send current state to this client (using broadcast version for SSE)
                     let state = game.GetState()
                     let assignment = assignmentManager.GetAssignment(gameId)
-                    let html = renderGameBoardForBroadcast gameId state assignment |> Render.toString
+                    let role = assignmentManager.GetRole(gameId, userId)
+                    // Render with user's role for this game
+                    let html = renderGameBoardWithContext gameId state role assignment gameCount |> Render.toString
                     let opts = { PatchElementsOptions.Defaults with Selector = ValueSome (Selector "#games-container"); PatchMode = ElementPatchMode.Append }
                     do! Datastar.patchElementsWithOptions opts html ctx
                 | None -> ()
@@ -187,7 +194,7 @@ let createGame (ctx: HttpContext) =
         let (gameId, game) = supervisor.CreateGame()
 
         // Subscribe to game state changes
-        subscribeToGame gameId game assignmentManager
+        subscribeToGame gameId game assignmentManager supervisor
 
         // Get initial state and broadcast to all clients
         use initialSub =
@@ -216,7 +223,7 @@ let getGame (ctx: HttpContext) =
         match supervisor.GetGame(gameId) with
         | Some game ->
             // Subscribe to ensure updates are broadcast
-            subscribeToGame gameId game assignmentManager
+            subscribeToGame gameId game assignmentManager supervisor
 
             // Get current state via a temporary subscription
             let mutable currentResult: MoveResult option = None
@@ -278,7 +285,7 @@ let makeMove (ctx: HttpContext) =
                     match validationResult with
                     | Allowed _ ->
                         // Ensure we're subscribed to broadcast updates
-                        subscribeToGame gameId game assignmentManager
+                        subscribeToGame gameId game assignmentManager supervisor
                         game.MakeMove(moveAction)
                         ctx.Response.StatusCode <- 202
                     | Rejected reason ->
@@ -365,7 +372,7 @@ let resetGame (ctx: HttpContext) =
                     let (newGameId, newGame) = supervisor.CreateGame()
 
                     // Subscribe to new game state changes
-                    subscribeToGame newGameId newGame assignmentManager
+                    subscribeToGame newGameId newGame assignmentManager supervisor
 
                     // Clear old game's player assignments
                     assignmentManager.RemoveGame(gameId)

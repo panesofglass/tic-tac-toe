@@ -17,6 +17,8 @@
     <Compile Include="RestApiTests.fs" />
     <Compile Include="MultiGameTests.fs" />
     <Compile Include="MultiPlayerTests.fs" />
+    <Compile Include="ResetGameTests.fs" />
+    <Compile Include="InitialGamesTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

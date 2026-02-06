@@ -42,14 +42,15 @@ let private gameSubscriptions =
     System.Collections.Concurrent.ConcurrentDictionary<string, IDisposable>()
 
 /// Subscribe to a game's state changes and broadcast updates
-let subscribeToGame (gameId: string) (game: Game) =
+let subscribeToGame (gameId: string) (game: Game) (assignmentManager: PlayerAssignmentManager) =
     if not (gameSubscriptions.ContainsKey(gameId)) then
         let subscription =
             game.Subscribe(
                 { new IObserver<MoveResult> with
                     member _.OnNext(result) =
                         // Use broadcast-specific rendering (no user context)
-                        let html = renderGameBoardForBroadcast gameId result |> Render.toString
+                        let assignment = assignmentManager.GetAssignment(gameId)
+                        let html = renderGameBoardForBroadcast gameId result assignment |> Render.toString
                         broadcast (PatchElements html)
 
                     member _.OnError(_) = ()
@@ -143,6 +144,7 @@ let sse (ctx: HttpContext) =
     task {
         let myChannel = subscribe ()
         let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let assignmentManager = ctx.RequestServices.GetRequiredService<PlayerAssignmentManager>()
 
         try
             // Clear loading state when client connects
@@ -154,7 +156,8 @@ let sse (ctx: HttpContext) =
                 | Some game ->
                     // Send current state to this client (using broadcast version for SSE)
                     let state = game.GetState()
-                    let html = renderGameBoardForBroadcast gameId state |> Render.toString
+                    let assignment = assignmentManager.GetAssignment(gameId)
+                    let html = renderGameBoardForBroadcast gameId state assignment |> Render.toString
                     let opts = { PatchElementsOptions.Defaults with Selector = ValueSome (Selector "#games-container"); PatchMode = ElementPatchMode.Append }
                     do! Datastar.patchElementsWithOptions opts html ctx
                 | None -> ()
@@ -180,17 +183,18 @@ let sse (ctx: HttpContext) =
 let createGame (ctx: HttpContext) =
     task {
         let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let assignmentManager = ctx.RequestServices.GetRequiredService<PlayerAssignmentManager>()
         let (gameId, game) = supervisor.CreateGame()
 
         // Subscribe to game state changes
-        subscribeToGame gameId game
+        subscribeToGame gameId game assignmentManager
 
         // Get initial state and broadcast to all clients
         use initialSub =
             game.Subscribe(
                 { new IObserver<MoveResult> with
                     member _.OnNext(result) =
-                        let html = renderGameBoardForBroadcast gameId result |> Render.toString
+                        let html = renderGameBoardForBroadcast gameId result None |> Render.toString
                         broadcast (PatchElementsAppend("#games-container", html))
 
                     member _.OnError(_) = ()
@@ -206,12 +210,13 @@ let createGame (ctx: HttpContext) =
 let getGame (ctx: HttpContext) =
     task {
         let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
+        let assignmentManager = ctx.RequestServices.GetRequiredService<PlayerAssignmentManager>()
         let gameId = ctx.Request.RouteValues.["id"] |> string
 
         match supervisor.GetGame(gameId) with
         | Some game ->
             // Subscribe to ensure updates are broadcast
-            subscribeToGame gameId game
+            subscribeToGame gameId game assignmentManager
 
             // Get current state via a temporary subscription
             let mutable currentResult: MoveResult option = None
@@ -267,13 +272,13 @@ let makeMove (ctx: HttpContext) =
                     let xTurn = isXTurn currentState
 
                     // Validate and potentially assign player
-                    let! (validationResult, _) =
-                        assignmentManager.TryAssignAndValidate(gameId, uid, xTurn) |> Async.StartAsTask
+                    let (validationResult, _) =
+                        assignmentManager.TryAssignAndValidate(gameId, uid, xTurn)
 
                     match validationResult with
                     | Allowed _ ->
                         // Ensure we're subscribed to broadcast updates
-                        subscribeToGame gameId game
+                        subscribeToGame gameId game assignmentManager
                         game.MakeMove(moveAction)
                         ctx.Response.StatusCode <- 202
                     | Rejected reason ->
@@ -312,7 +317,7 @@ let deleteGame (ctx: HttpContext) =
                 ctx.Response.StatusCode <- 409  // Conflict - would drop below minimum
             else
                 // Check authorization - must be PlayerX or PlayerO
-                let! role = assignmentManager.GetRole(gameId, uid) |> Async.StartAsTask
+                let role = assignmentManager.GetRole(gameId, uid)
                 match role with
                 | PlayerX | PlayerO ->
                     // Clear player assignments
@@ -344,12 +349,12 @@ let resetGame (ctx: HttpContext) =
         match supervisor.GetGame(gameId), userId with
         | Some oldGame, Some uid ->
             // Check authorization - must be PlayerX or PlayerO
-            let! role = assignmentManager.GetRole(gameId, uid) |> Async.StartAsTask
+            let role = assignmentManager.GetRole(gameId, uid)
             match role with
             | PlayerX | PlayerO ->
                 // Check if game has any activity (moves or assigned players)
                 let currentState = oldGame.GetState()
-                let! assignment = assignmentManager.GetAssignment(gameId) |> Async.StartAsTask
+                let assignment = assignmentManager.GetAssignment(gameId)
                 let hasActivity = hasMovesOrPlayers currentState assignment
 
                 if not hasActivity then
@@ -360,7 +365,7 @@ let resetGame (ctx: HttpContext) =
                     let (newGameId, newGame) = supervisor.CreateGame()
 
                     // Subscribe to new game state changes
-                    subscribeToGame newGameId newGame
+                    subscribeToGame newGameId newGame assignmentManager
 
                     // Clear old game's player assignments
                     assignmentManager.RemoveGame(gameId)
@@ -376,7 +381,7 @@ let resetGame (ctx: HttpContext) =
                         newGame.Subscribe(
                             { new IObserver<MoveResult> with
                                 member _.OnNext(result) =
-                                    let html = renderGameBoard newGameId result |> Render.toString
+                                    let html = renderGameBoardForBroadcast newGameId result None |> Render.toString
                                     broadcast (PatchElementsAppend("#games-container", html))
 
                                 member _.OnError(_) = ()

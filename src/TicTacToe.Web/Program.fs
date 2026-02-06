@@ -116,12 +116,13 @@ let gameReset =
 let createInitialGames (app: IApplicationBuilder) =
     let lifetime = app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
     let supervisor = app.ApplicationServices.GetRequiredService<GameSupervisor>()
+    let assignmentManager = app.ApplicationServices.GetRequiredService<PlayerAssignmentManager>()
 
     lifetime.ApplicationStarted.Register(fun () ->
         // Create 6 initial games
         for _ in 1..6 do
             let (gameId, game) = supervisor.CreateGame()
-            Handlers.subscribeToGame gameId game
+            Handlers.subscribeToGame gameId game assignmentManager
     ) |> ignore
     app
 

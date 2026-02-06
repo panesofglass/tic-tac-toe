@@ -119,21 +119,21 @@ let moveValidationResultTests =
 let playerAssignmentManagerTests =
     testList
         "PlayerAssignmentManager"
-        [ testAsync "GetRole returns UnassignedX for new game" {
+        [ test "GetRole returns UnassignedX for new game" {
               let manager = PlayerAssignmentManager()
-              let! role = manager.GetRole("new-game", "any-user")
+              let role = manager.GetRole("new-game", "any-user")
               Expect.equal role UnassignedX "New game should have UnassignedX role"
           }
 
-          testAsync "GetAssignment returns None for non-existent game" {
+          test "GetAssignment returns None for non-existent game" {
               let manager = PlayerAssignmentManager()
-              let! assignment = manager.GetAssignment("non-existent")
+              let assignment = manager.GetAssignment("non-existent")
               Expect.isNone assignment "Should return None for non-existent game"
           }
 
-          testAsync "TryAssignAndValidate assigns X on first move" {
+          test "TryAssignAndValidate assigns X on first move" {
               let manager = PlayerAssignmentManager()
-              let! (result, assignment) = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let (result, assignment) = manager.TryAssignAndValidate("game-1", "user-x", true)
 
               match result with
               | Allowed PlayerX -> ()
@@ -143,24 +143,24 @@ let playerAssignmentManagerTests =
               Expect.isNone assignment.PlayerOId "O should still be unassigned"
           }
 
-          testAsync "RemoveGame clears assignment" {
+          test "RemoveGame clears assignment" {
               let manager = PlayerAssignmentManager()
 
               // First assign a player
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
 
               // Verify assignment exists
-              let! assignmentBefore = manager.GetAssignment("game-1")
+              let assignmentBefore = manager.GetAssignment("game-1")
               Expect.isSome assignmentBefore "Assignment should exist before removal"
 
               // Remove game
               manager.RemoveGame("game-1")
 
               // Give mailbox time to process
-              do! Async.Sleep 50
+              System.Threading.Thread.Sleep(50)
 
               // Verify assignment is gone
-              let! assignmentAfter = manager.GetAssignment("game-1")
+              let assignmentAfter = manager.GetAssignment("game-1")
               Expect.isNone assignmentAfter "Assignment should be None after removal"
           } ]
 
@@ -171,18 +171,18 @@ let playerAssignmentManagerTests =
 let playerAssignmentPersistenceTests =
     testList
         "PlayerAssignmentManager Persistence"
-        [ testAsync "Assignments are retained across multiple GetRole queries" {
+        [ test "Assignments are retained across multiple GetRole queries" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // Query multiple times and verify consistency
               for _ in 1..5 do
-                  let! roleX = manager.GetRole("game-1", "user-x")
-                  let! roleO = manager.GetRole("game-1", "user-o")
-                  let! roleSpectator = manager.GetRole("game-1", "user-spectator")
+                  let roleX = manager.GetRole("game-1", "user-x")
+                  let roleO = manager.GetRole("game-1", "user-o")
+                  let roleSpectator = manager.GetRole("game-1", "user-spectator")
 
                   Expect.equal roleX PlayerX "User X should remain PlayerX"
                   Expect.equal roleO PlayerO "User O should remain PlayerO"
@@ -196,23 +196,23 @@ let playerAssignmentPersistenceTests =
 let firstMoveAssignmentTests =
     testList
         "First Move Assignment (US1)"
-        [ testAsync "First move on new game assigns user as Player X" {
+        [ test "First move on new game assigns user as Player X" {
               let manager = PlayerAssignmentManager()
-              let! (result, _) = manager.TryAssignAndValidate("game-1", "first-user", true)
+              let (result, _) = manager.TryAssignAndValidate("game-1", "first-user", true)
 
               match result with
               | Allowed PlayerX -> ()
               | _ -> failtest $"Expected Allowed PlayerX, got {result}"
           }
 
-          testAsync "After first move, user is recognized as PlayerX" {
+          test "After first move, user is recognized as PlayerX" {
               let manager = PlayerAssignmentManager()
 
               // Make first move
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
 
               // Verify role
-              let! role = manager.GetRole("game-1", "user-x")
+              let role = manager.GetRole("game-1", "user-x")
               Expect.equal role PlayerX "First mover should be PlayerX"
           } ]
 
@@ -223,20 +223,20 @@ let firstMoveAssignmentTests =
 let unassignedRoleTests =
     testList
         "Unassigned Role Detection (US1)"
-        [ testAsync "GetRole returns UnassignedX for completely new game" {
+        [ test "GetRole returns UnassignedX for completely new game" {
               let manager = PlayerAssignmentManager()
-              let! role = manager.GetRole("brand-new-game", "any-user")
+              let role = manager.GetRole("brand-new-game", "any-user")
               Expect.equal role UnassignedX "New game should show UnassignedX"
           }
 
-          testAsync "GetRole returns UnassignedO after X is assigned" {
+          test "GetRole returns UnassignedO after X is assigned" {
               let manager = PlayerAssignmentManager()
 
               // Assign X
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
 
               // Different user should see UnassignedO
-              let! role = manager.GetRole("game-1", "user-not-x")
+              let role = manager.GetRole("game-1", "user-not-x")
               Expect.equal role UnassignedO "After X assigned, other users should see UnassignedO"
           } ]
 
@@ -247,14 +247,14 @@ let unassignedRoleTests =
 let secondMoveAssignmentTests =
     testList
         "Second Move Assignment (US2)"
-        [ testAsync "Second move by different user assigns as Player O" {
+        [ test "Second move by different user assigns as Player O" {
               let manager = PlayerAssignmentManager()
 
               // First user becomes X
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
 
               // Second user (different) becomes O
-              let! (result, assignment) = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let (result, assignment) = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               match result with
               | Allowed PlayerO -> ()
@@ -263,15 +263,15 @@ let secondMoveAssignmentTests =
               Expect.equal assignment.PlayerOId (Some "user-o") "User should be assigned as O"
           }
 
-          testAsync "After second move, user is recognized as PlayerO" {
+          test "After second move, user is recognized as PlayerO" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // Verify role
-              let! role = manager.GetRole("game-1", "user-o")
+              let role = manager.GetRole("game-1", "user-o")
               Expect.equal role PlayerO "Second mover should be PlayerO"
           } ]
 
@@ -282,14 +282,14 @@ let secondMoveAssignmentTests =
 let sameUserCannotClaimBothTests =
     testList
         "Same User Cannot Claim Both (US2)"
-        [ testAsync "Same user cannot claim O slot after claiming X" {
+        [ test "Same user cannot claim O slot after claiming X" {
               let manager = PlayerAssignmentManager()
 
               // User becomes X
-              let! _ = manager.TryAssignAndValidate("game-1", "same-user", true)
+              let _ = manager.TryAssignAndValidate("game-1", "same-user", true)
 
               // Same user tries to become O
-              let! (result, _) = manager.TryAssignAndValidate("game-1", "same-user", false)
+              let (result, _) = manager.TryAssignAndValidate("game-1", "same-user", false)
 
               match result with
               | Rejected NotYourTurn -> () // User is X, can't move on O's turn
@@ -303,15 +303,15 @@ let sameUserCannotClaimBothTests =
 let turnEnforcementXTests =
     testList
         "Turn Enforcement - X on O's Turn (US3)"
-        [ testAsync "Player X cannot move when it is O's turn" {
+        [ test "Player X cannot move when it is O's turn" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // X tries to move on O's turn
-              let! (result, _) = manager.TryAssignAndValidate("game-1", "user-x", false)
+              let (result, _) = manager.TryAssignAndValidate("game-1", "user-x", false)
 
               match result with
               | Rejected NotYourTurn -> ()
@@ -325,15 +325,15 @@ let turnEnforcementXTests =
 let turnEnforcementOTests =
     testList
         "Turn Enforcement - O on X's Turn (US3)"
-        [ testAsync "Player O cannot move when it is X's turn" {
+        [ test "Player O cannot move when it is X's turn" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // O tries to move on X's turn
-              let! (result, _) = manager.TryAssignAndValidate("game-1", "user-o", true)
+              let (result, _) = manager.TryAssignAndValidate("game-1", "user-o", true)
 
               match result with
               | Rejected NotYourTurn -> ()
@@ -347,37 +347,37 @@ let turnEnforcementOTests =
 let thirdPartyRejectionTests =
     testList
         "Third Party Rejection (US4)"
-        [ testAsync "Third user is rejected as NotAPlayer" {
+        [ test "Third user is rejected as NotAPlayer" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // Third user tries to move
-              let! (result, _) = manager.TryAssignAndValidate("game-1", "user-third", true)
+              let (result, _) = manager.TryAssignAndValidate("game-1", "user-third", true)
 
               match result with
               | Rejected NotAPlayer -> ()
               | _ -> failtest $"Expected Rejected NotAPlayer, got {result}"
           }
 
-          testAsync "Third user rejected on both X and O turns" {
+          test "Third user rejected on both X and O turns" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // Third user tries on X's turn
-              let! (resultX, _) = manager.TryAssignAndValidate("game-1", "intruder", true)
+              let (resultX, _) = manager.TryAssignAndValidate("game-1", "intruder", true)
 
               match resultX with
               | Rejected NotAPlayer -> ()
               | _ -> failtest $"Expected NotAPlayer on X's turn, got {resultX}"
 
               // Third user tries on O's turn
-              let! (resultO, _) = manager.TryAssignAndValidate("game-1", "intruder", false)
+              let (resultO, _) = manager.TryAssignAndValidate("game-1", "intruder", false)
 
               match resultO with
               | Rejected NotAPlayer -> ()
@@ -391,14 +391,14 @@ let thirdPartyRejectionTests =
 let spectatorRoleTests =
     testList
         "Spectator Role Detection (US4)"
-        [ testAsync "GetRole returns Spectator for third user when both players assigned" {
+        [ test "GetRole returns Spectator for third user when both players assigned" {
               let manager = PlayerAssignmentManager()
 
               // Assign both players
-              let! _ = manager.TryAssignAndValidate("game-1", "user-x", true)
-              let! _ = manager.TryAssignAndValidate("game-1", "user-o", false)
+              let _ = manager.TryAssignAndValidate("game-1", "user-x", true)
+              let _ = manager.TryAssignAndValidate("game-1", "user-o", false)
 
               // Third user should be spectator
-              let! role = manager.GetRole("game-1", "spectator-user")
+              let role = manager.GetRole("game-1", "spectator-user")
               Expect.equal role Spectator "Third user should be Spectator"
           } ]

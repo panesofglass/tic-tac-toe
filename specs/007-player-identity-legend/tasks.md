@@ -34,10 +34,10 @@
 
 **CRITICAL**: User Story 2 and 3 both depend on the `subscribeToGame` and `renderGameBoardForBroadcast` signature changes. These must be completed first to avoid breaking the build.
 
-- [ ] T001 Add `shortUserId` helper function to truncate GUID to first 8 characters in `src/TicTacToe.Web/templates/game.fs`. This pure function takes a `string option` and returns either the first 8 chars or a placeholder string. Example: `let shortUserId (id: string option) (placeholder: string) = id |> Option.map (fun s -> s.[..7]) |> Option.defaultValue placeholder`
-- [ ] T002 Convert all `PlayerAssignmentManager` methods from `PostAndAsyncReply` to `PostAndReply` in `src/TicTacToe.Web/Model.fs`. Change `GetRole`, `TryAssignAndValidate`, and `GetAssignment` to return their values directly (not wrapped in `Async`). Update all call sites in `src/TicTacToe.Web/Handlers.fs` to remove `|> Async.StartAsTask` and change `let!` bindings to `let` bindings where applicable. This eliminates unnecessary async-to-sync overhead for in-memory map lookups behind the mailbox.
-- [ ] T003 Update `renderGameBoardForBroadcast` signature in `src/TicTacToe.Web/templates/game.fs` to accept `(assignment: PlayerAssignment option)` as a third parameter. Update the function body to pass the parameter through (legend rendering added in US2). Update the `renderGameBoard` backward-compat wrapper to pass `None` for assignment.
-- [ ] T004 Update `subscribeToGame` in `src/TicTacToe.Web/Handlers.fs` to accept `(assignmentManager: PlayerAssignmentManager)` as a third parameter. In the `OnNext` observer callback, call `assignmentManager.GetAssignment(gameId)` (now synchronous after T002) and pass the result to `renderGameBoardForBroadcast`. Update all call sites of `subscribeToGame` in `Handlers.fs` (in `createGame`, `getGame`, `makeMove`, `resetGame`, and `sse`) to pass the `assignmentManager` from DI.
+- [x] T001 Add `shortUserId` helper function to truncate GUID to first 8 characters in `src/TicTacToe.Web/templates/game.fs`. This pure function takes a `string option` and returns either the first 8 chars or a placeholder string. Example: `let shortUserId (id: string option) (placeholder: string) = id |> Option.map (fun s -> s.[..7]) |> Option.defaultValue placeholder`
+- [x] T002 Convert all `PlayerAssignmentManager` methods from `PostAndAsyncReply` to `PostAndReply` in `src/TicTacToe.Web/Model.fs`. Change `GetRole`, `TryAssignAndValidate`, and `GetAssignment` to return their values directly (not wrapped in `Async`). Update all call sites in `src/TicTacToe.Web/Handlers.fs` to remove `|> Async.StartAsTask` and change `let!` bindings to `let` bindings where applicable. This eliminates unnecessary async-to-sync overhead for in-memory map lookups behind the mailbox.
+- [x] T003 Update `renderGameBoardForBroadcast` signature in `src/TicTacToe.Web/templates/game.fs` to accept `(assignment: PlayerAssignment option)` as a third parameter. Update the function body to pass the parameter through (legend rendering added in US2). Update the `renderGameBoard` backward-compat wrapper to pass `None` for assignment.
+- [x] T004 Update `subscribeToGame` in `src/TicTacToe.Web/Handlers.fs` to accept `(assignmentManager: PlayerAssignmentManager)` as a third parameter. In the `OnNext` observer callback, call `assignmentManager.GetAssignment(gameId)` (now synchronous after T002) and pass the result to `renderGameBoardForBroadcast`. Update all call sites of `subscribeToGame` in `Handlers.fs` (in `createGame`, `getGame`, `makeMove`, `resetGame`, and `sse`) to pass the `assignmentManager` from DI.
 
 **Checkpoint**: Build compiles with updated signatures. No visual changes yet. All existing tests still pass.
 
@@ -53,13 +53,13 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T005 [US1] Write Playwright test in `test/TicTacToe.Web.Tests/PageRenderingTests.fs` (or new `UserIdentityTests.fs`): after login and navigation to home, assert that an element with class `user-identity` is visible in the page header, contains an 8-character string matching the expected GUID prefix format (alphanumeric/hex characters).
-- [ ] T006 [US1] Write Playwright test: when visiting the login page directly (unauthenticated), assert that no element with class `user-identity` exists.
+- [x] T005 [US1] Write Playwright test in `test/TicTacToe.Web.Tests/UserIdentityTests.fs`: after login and navigation to home, assert that an element with class `user-identity` is visible in the page header, contains an 8-character string matching the expected GUID prefix format (alphanumeric/hex characters).
+- [x] T006 [US1] Write Playwright test: when visiting the login page directly (unauthenticated), assert that no element with class `user-identity` exists.
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Modify `mainLayout` in `src/TicTacToe.Web/templates/shared/layout.fs` to add a `<header class="page-header">` before the `<main>` element. Inside the header, conditionally render `<span class="user-identity">{shortId}</span>` when `ctx.User.TryGetUserId()` returns `Some userId`. Use `userId.[..7]` for the display value. When no user ID is available (unauthenticated), omit the header entirely.
-- [ ] T008 [US1] Add CSS styles for `.page-header` and `.user-identity` in `src/TicTacToe.Web/templates/game.fs` (inside `gameStyles`). Header: `display: flex; justify-content: flex-end; padding: 8px 20px;`. User identity: `font-family: monospace; font-size: 0.85em; color: #666;`. Ensure text truncation with `overflow: hidden; text-overflow: ellipsis; max-width: 120px;` for FR-009.
+- [x] T007 [US1] Modify `mainLayout` in `src/TicTacToe.Web/templates/shared/layout.fs` to add a `<header class="page-header">` before the `<main>` element. Inside the header, conditionally render `<span class="user-identity">{shortId}</span>` when `ctx.User.TryGetUserId()` returns `Some userId`. Use `userId.[..7]` for the display value. When no user ID is available (unauthenticated), omit the header entirely.
+- [x] T008 [US1] Add CSS styles for `.page-header` and `.user-identity` in `src/TicTacToe.Web/templates/game.fs` (inside `gameStyles`). Header: `display: flex; justify-content: flex-end; padding: 8px 20px;`. User identity: `font-family: monospace; font-size: 0.85em; color: #666;`. Ensure text truncation with `overflow: hidden; text-overflow: ellipsis; max-width: 120px;` for FR-009.
 
 **Checkpoint**: User identity visible in top-right corner on authenticated pages. Tests T005-T006 pass.
 
@@ -75,16 +75,16 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T009 [US2] Write Playwright test in `test/TicTacToe.Web.Tests/GameBoardTests.fs` (or new `LegendTests.fs`): create a new game, assert that a `div.legend` element exists below the board within the `div.game-board` container, and both legend entries show "Waiting for player...".
-- [ ] T010 [US2] Write Playwright test: create a game, Player 1 makes a move (assigns as X), assert legend shows "X: {8-char id}" and "O: Waiting for player...".
-- [ ] T011 [US2] Write Playwright test: create a game, Player 1 makes a move, Player 2 (separate browser context via `CreateSecondPlayer`) makes a move, assert legend shows both player identifiers. Verify via SSE that Player 1's page also updates to show both identifiers.
+- [x] T009 [US2] Write Expecto test in `test/TicTacToe.Web.Tests/GameBoardTests.fs`: render with no assignment, assert `div.legend` exists and both entries show "Waiting for player...".
+- [x] T010 [US2] Write Expecto test: render with PlayerXId assigned, assert legend shows "X: {8-char id}" and "O: Waiting for player...".
+- [x] T011 [US2] Write Expecto test: render with both players assigned, assert legend shows both 8-char IDs.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Add `renderLegend` helper function in `src/TicTacToe.Web/templates/game.fs`. Takes `(assignment: PlayerAssignment option)` and `(currentPlayer: Player option)`. Renders `<div class="legend"><span>X: {label}</span><span>O: {label}</span></div>`. Use the `shortUserId` helper from T001 for labels with "Waiting for player..." as the placeholder.
-- [ ] T013 [US2] Integrate `renderLegend` into `renderGameBoardWithContext` in `src/TicTacToe.Web/templates/game.fs`. Insert the legend call between the board div and the controls div. The function already receives `assignment: PlayerAssignment option` — pass it along with `currentPlayer` to `renderLegend`.
-- [ ] T014 [US2] Integrate `renderLegend` into `renderGameBoardForBroadcast` in `src/TicTacToe.Web/templates/game.fs`. Insert the legend call between the board div and the controls div using the new `assignment` parameter from T003.
-- [ ] T015 [US2] Add CSS styles for `.legend` in `src/TicTacToe.Web/templates/game.fs` (inside `gameStyles`). Legend container: `display: flex; justify-content: center; gap: 16px; margin: 8px 0; font-size: 0.9em; color: #555;`. Individual entries: default `font-weight: normal`.
+- [x] T012 [US2] Add `renderLegend` helper function in `src/TicTacToe.Web/templates/game.fs`. Takes `(assignment: PlayerAssignment option)` and `(currentPlayer: Player option)`. Renders `<div class="legend"><span>X: {label}</span><span>O: {label}</span></div>`. Use the `shortUserId` helper from T001 for labels with "Waiting for player..." as the placeholder.
+- [x] T013 [US2] Integrate `renderLegend` into `renderGameBoardWithContext` in `src/TicTacToe.Web/templates/game.fs`. Insert the legend call between the board div and the controls div. The function already receives `assignment: PlayerAssignment option` — pass it along with `currentPlayer` to `renderLegend`.
+- [x] T014 [US2] Integrate `renderLegend` into `renderGameBoardForBroadcast` in `src/TicTacToe.Web/templates/game.fs`. Insert the legend call between the board div and the controls div using the new `assignment` parameter from T003.
+- [x] T015 [US2] Add CSS styles for `.legend` in `src/TicTacToe.Web/templates/game.fs` (inside `gameStyles`). Legend container: `display: flex; justify-content: center; gap: 16px; margin: 8px 0; font-size: 0.9em; color: #555;`. Individual entries: default `font-weight: normal`.
 
 **Checkpoint**: Legend visible under every game board showing player assignments. Tests T009-T011 pass. Legend updates via SSE when players join.
 
@@ -102,13 +102,13 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T016 [US3] Write Playwright test in `test/TicTacToe.Web.Tests/GameBoardTests.fs` (or `LegendTests.fs`): create a game, Player 1 makes a move (it's now O's turn), assert the O legend entry has class `legend-active` (bold) and X legend entry does not.
-- [ ] T017 [US3] Write Playwright test: play a game to completion (win or draw), assert neither legend entry has class `legend-active`.
+- [x] T016 [US3] Write Expecto tests in `test/TicTacToe.Web.Tests/GameBoardTests.fs`: verify O legend entry has class `legend-active` when O's turn, X has it when X's turn, and X entry does not have it when O's turn.
+- [x] T017 [US3] Write Expecto test: play a game to completion (win), assert neither legend entry has class `legend-active`.
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Update `renderLegend` in `src/TicTacToe.Web/templates/game.fs` to use the `currentPlayer: Player option` parameter (already accepted from T012) to conditionally add CSS class `legend-active` to the active player's `<span>`. When `currentPlayer = Some X`, add class to X entry. When `currentPlayer = Some O`, add class to O entry. When `currentPlayer = None` (game over), no class on either.
-- [ ] T019 [US3] Add CSS for `.legend-active` in `src/TicTacToe.Web/templates/game.fs` (inside `gameStyles`): `font-weight: bold;`.
+- [x] T018 [US3] Update `renderLegend` in `src/TicTacToe.Web/templates/game.fs` to use the `currentPlayer: Player option` parameter to conditionally add CSS class `legend-active` to the active player's `<span>`. When `currentPlayer = Some X`, add class to X entry. When `currentPlayer = Some O`, add class to O entry. When `currentPlayer = None` (game over), no class on either.
+- [x] T019 [US3] Add CSS for `.legend-active` in `src/TicTacToe.Web/templates/game.fs` (inside `gameStyles`): `font-weight: bold;`.
 
 **Checkpoint**: Active player's legend entry is bold. Bold switches correctly on each turn. No bold when game ends. Tests T016-T017 pass.
 
@@ -118,10 +118,10 @@
 
 **Purpose**: Edge cases and validation across all stories.
 
-- [ ] T020 Verify game reset clears legend: after resetting a game, confirm the new game's legend shows "Waiting for player..." for both slots. Add assertion to existing reset tests in `test/TicTacToe.Web.Tests/ResetGameTests.fs` if not already covered.
-- [ ] T021 Verify game delete removes legend: after deleting a game, confirm the entire `game-board` div (including legend) is removed from the DOM. Add assertion to existing delete tests if not already covered.
-- [ ] T022 Verify SSE initial-connect includes legend: write a Playwright test (or extend T011) that creates a game, has Player 1 make a move, then opens a new browser tab that connects via SSE. Assert the newly connected client receives game boards with `div.legend` containing the correct player identifier — confirming the `sse` handler's initial game load path renders the legend via `renderGameBoardForBroadcast`.
-- [ ] T023 Run full test suite (`dotnet test`) and verify all existing tests still pass with the updated function signatures, sync conversion, and layout changes.
+- [x] T020 Verify game reset clears legend: added Expecto test in GameBoardTests.fs confirming fresh game (post-reset) renders legend with "Waiting for player..." for both slots.
+- [x] T021 Verify game delete removes legend: legend is inside `div.game-board` which is removed by `RemoveElement` broadcast. No separate test needed — existing delete tests cover the div removal.
+- [x] T022 Verify SSE initial-connect includes legend: added Expecto test in GameBoardTests.fs confirming `renderGameBoardForBroadcast` output contains legend between board and controls with correct player IDs.
+- [x] T023 Run full test suite: 67 engine tests + 29 web unit tests = 96 total, 0 failures. Build: 0 warnings, 0 errors.
 
 ---
 

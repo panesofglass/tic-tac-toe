@@ -6,6 +6,7 @@ open Expecto
 open Oxpecker.ViewEngine
 open TicTacToe.Web.templates.game
 open TicTacToe.Model
+open TicTacToe.Web.Model
 
 // Helper to create a game state with specific moves
 let createGameStateWith (moves: (SquarePosition * Player) list) =
@@ -36,6 +37,10 @@ let testGameId = "test-game-123"
 
 let renderGameBoardToString result =
     let element = renderGameBoard testGameId result
+    Render.toString element
+
+let renderBroadcastToString result assignment =
+    let element = renderGameBoardForBroadcast testGameId result assignment
     Render.toString element
 
 [<Tests>]
@@ -185,4 +190,117 @@ let tests =
                   let html = renderGameBoardToString result
                   let expectedMessage = $"{expectedPlayer}&#39;s turn"
 
-                  Expect.stringContains html expectedMessage $"Should show {expectedPlayer}'s turn for move {i}" ]
+                  Expect.stringContains html expectedMessage $"Should show {expectedPlayer}'s turn for move {i}"
+
+          testCase "Legend shows waiting for both players when no assignment"
+          <| fun _ ->
+              let emptyState = createGameStateWith []
+
+              let allPositions =
+                  [| TopLeft; TopCenter; TopRight
+                     MiddleLeft; MiddleCenter; MiddleRight
+                     BottomLeft; BottomCenter; BottomRight |]
+
+              let result = createXTurnResult emptyState allPositions
+              let html = renderBroadcastToString result None
+
+              Expect.stringContains html "class=\"legend\"" "Should contain legend div"
+              Expect.stringContains html "X: Waiting for player..." "Should show waiting for player X"
+              Expect.stringContains html "O: Waiting for player..." "Should show waiting for player O"
+
+          testCase "Legend shows player X ID and waiting for player O"
+          <| fun _ ->
+              let emptyState = createGameStateWith []
+
+              let allPositions =
+                  [| TopLeft; TopCenter; TopRight
+                     MiddleLeft; MiddleCenter; MiddleRight
+                     BottomLeft; BottomCenter; BottomRight |]
+
+              let result = createXTurnResult emptyState allPositions
+              let assignment = Some { GameId = testGameId; PlayerXId = Some "abcdef12-3456-7890-abcd-ef1234567890"; PlayerOId = None }
+              let html = renderBroadcastToString result assignment
+
+              Expect.stringContains html "X: abcdef12" "Should show first 8 chars of player X ID"
+              Expect.stringContains html "O: Waiting for player..." "Should show waiting for player O"
+
+          testCase "Legend shows both player IDs when both assigned"
+          <| fun _ ->
+              let emptyState = createGameStateWith []
+
+              let allPositions =
+                  [| TopLeft; TopCenter; TopRight
+                     MiddleLeft; MiddleCenter; MiddleRight
+                     BottomLeft; BottomCenter; BottomRight |]
+
+              let result = createXTurnResult emptyState allPositions
+              let assignment = Some { GameId = testGameId; PlayerXId = Some "abcdef12-3456-7890-abcd-ef1234567890"; PlayerOId = Some "99887766-5544-3322-1100-aabbccddeeff" }
+              let html = renderBroadcastToString result assignment
+
+              Expect.stringContains html "X: abcdef12" "Should show first 8 chars of player X ID"
+              Expect.stringContains html "O: 99887766" "Should show first 8 chars of player O ID"
+
+          testCase "Legend highlights active player O when it is O's turn"
+          <| fun _ ->
+              let gameState = createGameStateWith [ (TopLeft, X) ]
+              let remainingMoves = [| TopCenter; TopRight; MiddleLeft; MiddleCenter; MiddleRight; BottomLeft; BottomCenter; BottomRight |]
+              let result = createOTurnResult gameState remainingMoves
+              let assignment = Some { GameId = testGameId; PlayerXId = Some "abcdef12-3456-7890-abcd-ef1234567890"; PlayerOId = Some "99887766-5544-3322-1100-aabbccddeeff" }
+              let html = renderBroadcastToString result assignment
+
+              Expect.stringContains html "class=\"legend-active\"" "Should have legend-active class for active player"
+              // O's span should have the active class since it's O's turn
+              Expect.stringContains html "<span class=\"legend-active\">O:" "O legend entry should be active"
+              Expect.isFalse (html.Contains("<span class=\"legend-active\">X:")) "X legend entry should not be active"
+
+          testCase "Legend highlights active player X when it is X's turn"
+          <| fun _ ->
+              let emptyState = createGameStateWith []
+              let allPositions = [| TopLeft; TopCenter; TopRight; MiddleLeft; MiddleCenter; MiddleRight; BottomLeft; BottomCenter; BottomRight |]
+              let result = createXTurnResult emptyState allPositions
+              let assignment = Some { GameId = testGameId; PlayerXId = Some "abcdef12-3456-7890-abcd-ef1234567890"; PlayerOId = Some "99887766-5544-3322-1100-aabbccddeeff" }
+              let html = renderBroadcastToString result assignment
+
+              Expect.stringContains html "<span class=\"legend-active\">X:" "X legend entry should be active"
+              Expect.isFalse (html.Contains("<span class=\"legend-active\">O:")) "O legend entry should not be active"
+
+          testCase "Legend has no active player when game is over"
+          <| fun _ ->
+              let gameState =
+                  createGameStateWith
+                      [ (TopLeft, X); (TopCenter, X); (TopRight, X)
+                        (MiddleLeft, O); (MiddleCenter, O) ]
+              let result = createWonResult gameState X
+              let assignment = Some { GameId = testGameId; PlayerXId = Some "abcdef12-3456-7890-abcd-ef1234567890"; PlayerOId = Some "99887766-5544-3322-1100-aabbccddeeff" }
+              let html = renderBroadcastToString result assignment
+
+              Expect.isFalse (html.Contains("legend-active")) "Should not have legend-active class when game is over"
+
+          testCase "Reset game renders legend with waiting for both players"
+          <| fun _ ->
+              // After reset, game is fresh: XTurn with no assignment
+              let emptyState = createGameStateWith []
+              let allPositions = [| TopLeft; TopCenter; TopRight; MiddleLeft; MiddleCenter; MiddleRight; BottomLeft; BottomCenter; BottomRight |]
+              let result = createXTurnResult emptyState allPositions
+              let html = renderBroadcastToString result None
+
+              Expect.stringContains html "class=\"legend\"" "Reset game should contain legend div"
+              Expect.stringContains html "X: Waiting for player..." "Reset game should show waiting for player X"
+              Expect.stringContains html "O: Waiting for player..." "Reset game should show waiting for player O"
+
+          testCase "Game board div contains legend for SSE broadcast"
+          <| fun _ ->
+              // SSE initial-connect uses renderGameBoardForBroadcast - verify legend is in the game-board div
+              let gameState = createGameStateWith [ (TopLeft, X) ]
+              let remainingMoves = [| TopCenter; TopRight; MiddleLeft; MiddleCenter; MiddleRight; BottomLeft; BottomCenter; BottomRight |]
+              let result = createOTurnResult gameState remainingMoves
+              let assignment = Some { GameId = testGameId; PlayerXId = Some "abcdef12-3456-7890-abcd-ef1234567890"; PlayerOId = None }
+              let html = renderBroadcastToString result assignment
+
+              // Verify legend is inside the game-board div (between board and controls)
+              let legendIdx = html.IndexOf("class=\"legend\"")
+              let boardIdx = html.IndexOf("class=\"board\"")
+              let controlsIdx = html.IndexOf("class=\"controls\"")
+              Expect.isGreaterThan legendIdx boardIdx "Legend should come after board"
+              Expect.isLessThan legendIdx controlsIdx "Legend should come before controls"
+              Expect.stringContains html "X: abcdef12" "SSE broadcast should include player X ID in legend" ]

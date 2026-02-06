@@ -23,6 +23,10 @@ let private getSquareValue (gameState: GameState) (position: SquarePosition) : s
 let private isValidMove (validMoves: SquarePosition array) (position: SquarePosition) : bool =
     validMoves |> Array.contains position
 
+/// Display first 8 characters of a user ID, or a placeholder if not assigned
+let shortUserId (id: string option) (placeholder: string) =
+    id |> Option.map (fun s -> s.[..7]) |> Option.defaultValue placeholder
+
 /// Check if game has any moves or assigned players
 let hasMovesOrPlayers (result: MoveResult) (assignment: PlayerAssignment option) =
     match result with
@@ -46,6 +50,17 @@ let canDelete gameCount role =
     match role with
     | PlayerX | PlayerO -> true
     | Spectator | UnassignedX | UnassignedO -> false
+
+/// Render the player legend showing X and O assignments
+let renderLegend (assignment: PlayerAssignment option) (currentPlayer: Player option) =
+    let xLabel = assignment |> Option.bind (fun a -> a.PlayerXId) |> fun id -> shortUserId id "Waiting for player..."
+    let oLabel = assignment |> Option.bind (fun a -> a.PlayerOId) |> fun id -> shortUserId id "Waiting for player..."
+    let xClass = if currentPlayer = Some X then "legend-active" else ""
+    let oClass = if currentPlayer = Some O then "legend-active" else ""
+    div(class' = "legend") {
+        span(class' = xClass) { $"X: {xLabel}" }
+        span(class' = oClass) { $"O: {oLabel}" }
+    }
 
 let private renderSquare
     (gameId: string)
@@ -104,6 +119,9 @@ let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: 
                 renderSquare gameId gameState validMoves currentPlayer position
         }
 
+        // Player legend
+        renderLegend assignment currentPlayer
+
         // Game controls - Reset and Delete buttons
         div(class' = "controls") {
             if resetEnabled then
@@ -131,7 +149,7 @@ let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: 
 
 /// Render game board for SSE broadcast (minimal context - server validates actions)
 /// Uses simplified enable logic: reset enabled if game has activity, delete always disabled
-let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) =
+let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) (assignment: PlayerAssignment option) =
     let (gameState, currentPlayer, validMoves, status) =
         match result with
         | XTurn(state, moves) -> (state, Some X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
@@ -156,6 +174,9 @@ let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) =
             for position in allPositions do
                 renderSquare gameId gameState validMoves currentPlayer position
         }
+
+        // Player legend
+        renderLegend assignment currentPlayer
 
         // Game controls - Reset and Delete buttons enabled if activity (server validates authorization)
         div(class' = "controls") {
@@ -282,6 +303,19 @@ let gameStyles =
             font-size: 1em;
         }
 
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin: 8px 0;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .legend-active {
+            font-weight: bold;
+        }
+
         .controls {
             text-align: center;
         }
@@ -355,6 +389,21 @@ let gameStyles =
             text-align: center;
             margin-top: 20px;
             color: #666;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: flex-end;
+            padding: 8px 20px;
+        }
+
+        .user-identity {
+            font-family: monospace;
+            font-size: 0.85em;
+            color: #666;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
         }
         """
     }

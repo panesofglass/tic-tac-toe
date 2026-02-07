@@ -84,13 +84,16 @@ let private renderSquare (ctx: SquareRenderContext) (position: SquarePosition) =
         | Some a -> a.PlayerXId.IsNone && a.PlayerOId.IsNone
 
     // Check if viewer can make a move:
-    // 1. If viewer is the current player, they can move
-    // 2. If game is unassigned, anyone can move (to claim role)
+    // 1. For unassigned games: always allow (anyone can claim a role)
+    // 2. For assigned games: only if viewer is the current player
     let canViewerMove =
-        match (ctx.viewerRole, ctx.currentPlayer) with
-        | (PlayerX, Some X) | (PlayerO, Some O) -> true  // Assigned player on their turn
-        | _ when isGameUnassigned -> true  // Unassigned game: allow anyone to move
-        | _ -> false
+        if isGameUnassigned then
+            true  // Unassigned game: allow anyone to move (to claim role)
+        else
+            // Assigned game: only assigned players on their turn can move
+            match (ctx.viewerRole, ctx.currentPlayer) with
+            | (PlayerX, Some X) | (PlayerO, Some O) -> true
+            | _ -> false
 
     if canMove && canViewerMove then
         let playerStr = ctx.currentPlayer.Value.ToString()

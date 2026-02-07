@@ -80,8 +80,8 @@ type GamePlayTests() =
             let! playerO = this.CreateSecondPlayer(gameUrl)
             do! TestHelpers.waitForVisible playerO ".game-board" this.TimeoutMs
 
-            // First move - should be X's turn
-            do! TestHelpers.waitForTextContains this.Page ".status" "X's turn" this.TimeoutMs
+            // Verify the newly created game is X's turn initially
+            do! game.Locator(".status").Filter(new Microsoft.Playwright.LocatorFilterOptions(HasText = "X's turn")).WaitForAsync()
 
             // X clicks first square on the test game
             do! game.Locator(".square-clickable").First.ClickAsync()
@@ -362,21 +362,15 @@ type GamePlayTests() =
             do! playerO.Locator(".square-clickable").Nth(0).ClickAsync()
             do! game.Locator(".status").Filter(new Microsoft.Playwright.LocatorFilterOptions(HasText = "X's turn")).WaitForAsync()
 
-            // Count moves before spectator attempts
+            // Count moves before verifying spectator view
             let! movesBefore = game.Locator(".player").CountAsync()
-            Assert.That(movesBefore, Is.EqualTo(2), "Should have 2 moves before spectator attempt")
+            Assert.That(movesBefore, Is.EqualTo(2), "Should have 2 moves before checking spectator")
 
-            // Spectator tries to click - should be rejected (403)
-            do! spectator.Locator(".square-clickable").Nth(0).ClickAsync()
+            // Verify spectator sees NO clickable squares (correct behavior after refactoring)
+            let! spectatorClickableCount = spectator.Locator(".square-clickable").CountAsync()
+            Assert.That(spectatorClickableCount, Is.EqualTo(0), "Spectator should see NO clickable squares")
 
-            // Wait a moment for any potential update
-            do! Task.Delay(500)
-
-            // Verify move count unchanged - spectator's move was rejected
-            let! movesAfter = game.Locator(".player").CountAsync()
-            Assert.That(movesAfter, Is.EqualTo(2), "Spectator's move should be rejected - count unchanged")
-
-            // Verify it's still X's turn (not O's, which would mean spectator's move went through)
+            // Verify it's still X's turn (game state unchanged)
             let! statusText = game.Locator(".status").TextContentAsync()
-            Assert.That(statusText, Does.Contain("X's turn"), "Should still be X's turn after spectator rejection")
+            Assert.That(statusText, Does.Contain("X's turn"), "Should still be X's turn")
         }

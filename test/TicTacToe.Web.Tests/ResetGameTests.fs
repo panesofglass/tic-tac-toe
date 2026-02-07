@@ -40,11 +40,11 @@ type ResetGameTests() =
     [<Test>]
     member this.``Reset button creates new game in same position``() : Task =
         task {
-            // Wait for games to be visible
-            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
+            // Create a fresh game to test
+            do! this.CreateGame()
             let! initialCount = this.Page.Locator(".game-board").CountAsync()
 
-            let game = this.Page.Locator(".game-board").First
+            let game = this.Page.Locator(".game-board").Last
 
             // Make a move to enable reset (user becomes PlayerX)
             do! this.MakeMove(game)
@@ -73,10 +73,9 @@ type ResetGameTests() =
     [<Test>]
     member this.``Reset clears player assignments and shows X's turn``() : Task =
         task {
-            // Wait for 6 initial games
-            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
-
-            let game = this.Page.Locator(".game-board").First
+            // Create a fresh game for clean test state
+            do! this.CreateGame()
+            let game = this.Page.Locator(".game-board").Last
 
             // Make a move
             do! this.MakeMove(game)
@@ -89,7 +88,7 @@ type ResetGameTests() =
             do! game.Locator(".reset-game-btn").ClickAsync()
             do! Task.Delay(500)
 
-            // Verify one of the games shows X's turn (the reset game should show X's turn)
+            // Verify the reset game shows X's turn (the reset game should show X's turn)
             // Note: After reset, a new game is created at the end
             let lastGame = this.Page.Locator(".game-board").Last
             let! status = lastGame.Locator(".status").TextContentAsync()
@@ -99,10 +98,10 @@ type ResetGameTests() =
     [<Test>]
     member this.``Reset broadcasts to all connected clients``() : Task =
         task {
-            // Wait for initial games
-            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
+            // Create a fresh game to test
+            do! this.CreateGame()
 
-            let game = this.Page.Locator(".game-board").First
+            let game = this.Page.Locator(".game-board").Last
 
             // Make a move
             do! this.MakeMove(game)
@@ -139,12 +138,14 @@ type ResetGameTests() =
     [<Test>]
     member this.``Reset maintains game count``() : Task =
         task {
-            // Verify games exist
+            // Get initial count
             do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
             let! initialCount = this.Page.Locator(".game-board").CountAsync()
             Assert.That(initialCount, Is.GreaterThanOrEqualTo(6), "Should have at least 6 games")
 
-            let game = this.Page.Locator(".game-board").First
+            // Create a fresh game for testing
+            do! this.CreateGame()
+            let game = this.Page.Locator(".game-board").Last
 
             // Make a move to enable reset
             do! this.MakeMove(game)
@@ -157,9 +158,9 @@ type ResetGameTests() =
             do! game.Locator(".reset-game-btn").ClickAsync()
             do! Task.Delay(500)
 
-            // Verify same number of games
+            // Verify same number of games (reset replaces, doesn't add or remove)
             let! count = this.Page.Locator(".game-board").CountAsync()
-            Assert.That(count, Is.EqualTo(initialCount), "Should have same number of games after reset")
+            Assert.That(count, Is.EqualTo(initialCount + 1), "Should have initial count + 1 (created game) after reset")
         }
 
     // ============================================================================
@@ -170,11 +171,11 @@ type ResetGameTests() =
     [<Order(0)>] // Must run before any test that makes moves
     member this.``Reset button disabled on fresh game with no players``() : Task =
         task {
-            // Wait for initial games
-            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
+            // Create a fresh game to test
+            do! this.CreateGame()
 
-            // Check the first game's reset button is disabled
-            let game = this.Page.Locator(".game-board").First
+            // Check the newly created game's reset button is disabled
+            let game = this.Page.Locator(".game-board").Last
             let resetButton = game.Locator(".reset-game-btn")
 
             let! isDisabled = resetButton.IsDisabledAsync()
@@ -185,9 +186,10 @@ type ResetGameTests() =
     [<Order(1)>] // Must run after disabled test but before other tests
     member this.``Reset button enabled after first move``() : Task =
         task {
-            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
+            // Create a fresh game to test
+            do! this.CreateGame()
 
-            let game = this.Page.Locator(".game-board").First
+            let game = this.Page.Locator(".game-board").Last
 
             // Verify reset is initially disabled
             let resetButton = game.Locator(".reset-game-btn")
@@ -206,10 +208,10 @@ type ResetGameTests() =
     [<Test>]
     member this.``Reset button disabled for spectators``() : Task =
         task {
-            // Wait for 6 initial games
-            do! TestHelpers.waitForVisible this.Page ".game-board" this.TimeoutMs
+            // Create a fresh game to test
+            do! this.CreateGame()
 
-            let game = this.Page.Locator(".game-board").First
+            let game = this.Page.Locator(".game-board").Last
             let! gameId = game.GetAttributeAsync("id")
             let gameIdValue = gameId.Substring("game-".Length)
 

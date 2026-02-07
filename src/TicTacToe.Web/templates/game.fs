@@ -115,7 +115,8 @@ let private renderControls gameId viewerPlayer assignment gameCount activity =
         | Some O, Some { PlayerOId = Some _ } ->
             (activity, true)
         | _ ->
-            (gameCount > 6, gameCount > 6)
+            // For unassigned games/spectators: only enable if there's activity AND gameCount > 6
+            (activity && gameCount > 6, gameCount > 6)
     div(class' = "controls") {
         if resetEnabled then
             button(class' = "reset-game-btn", type' = "button")

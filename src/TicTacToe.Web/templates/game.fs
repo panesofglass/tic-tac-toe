@@ -77,20 +77,22 @@ let private renderSquare (ctx: SquareRenderContext) (position: SquarePosition) =
     let isEmpty = System.String.IsNullOrEmpty(value)
     let canMove = isEmpty && isValidMove ctx.validMoves position
 
-    // Check if viewer can make a move:
-    // 1. If viewer is the current player, they can move
-    // 2. If game is unassigned (new game), unassigned players can make the first move
-    let isViewerCurrentPlayer =
-        match (ctx.viewerRole, ctx.currentPlayer) with
-        | (PlayerX, Some X) | (PlayerO, Some O) -> true
-        | _ -> false
-
+    // Check if game is unassigned (new game with no claimed roles)
     let isGameUnassigned =
         match ctx.assignment with
         | None -> true
         | Some a -> a.PlayerXId.IsNone && a.PlayerOId.IsNone
 
-    if canMove && (isViewerCurrentPlayer || isGameUnassigned) then
+    // Check if viewer can make a move:
+    // 1. If viewer is the current player, they can move
+    // 2. If game is unassigned, anyone can move (to claim role)
+    let canViewerMove =
+        match (ctx.viewerRole, ctx.currentPlayer) with
+        | (PlayerX, Some X) | (PlayerO, Some O) -> true  // Assigned player on their turn
+        | _ when isGameUnassigned -> true  // Unassigned game: allow anyone to move
+        | _ -> false
+
+    if canMove && canViewerMove then
         let playerStr = ctx.currentPlayer.Value.ToString()
         // Clickable button - sets signals in click handler then posts to game-specific endpoint
         button(class' = "square square-clickable", type' = "button")

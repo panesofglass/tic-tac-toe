@@ -13,12 +13,13 @@ type AffordanceTests() =
     [<Test>]
     member this.``Player X on their turn sees clickable move squares`` () : Task =
         task {
-            // Create a game by making the first move as Player X
+            // Create a dedicated new game for this test to avoid shared state
             do! this.Page.ClickAsync("button:has-text('New Game')")
-            let! _ = this.Page.WaitForFunctionAsync("() => document.querySelectorAll('[id^=game-]').length > 0")
+            let! _ = this.Page.WaitForTimeoutAsync(200.0f) // Wait for game creation
 
-            // Get the first game's ID from the DOM
-            let! id = this.Page.Locator("[id^=game-]").First.GetAttributeAsync("id")
+            // Get the newly created game's ID (should be the last one)
+            let! allGames = this.Page.Locator("[id^=game-]").AllAsync()
+            let! id = allGames.[allGames.Count - 1].GetAttributeAsync("id")
 
             // Verify that Player X sees clickable squares (square elements with class square-clickable)
             let clickableSquares = this.Page.Locator($"#{id} .square-clickable")
@@ -43,12 +44,13 @@ type AffordanceTests() =
             // Create two browser contexts for two-player game
             let! player2Page = this.CreateSecondPlayer(this.BaseUrl)
 
-            // Player 1 creates a new game
+            // Player 1 creates a dedicated new game for this test
             do! this.Page.ClickAsync("button:has-text('New Game')")
-            let! _ = this.Page.WaitForFunctionAsync("() => document.querySelectorAll('[id^=game-]').length > 0")
+            let! _ = this.Page.WaitForTimeoutAsync(200.0f) // Wait for game creation
 
-            // Get the game ID
-            let! id = this.Page.Locator("[id^=game-]").First.GetAttributeAsync("id")
+            // Get the newly created game's ID (should be the last one)
+            let! allGames = this.Page.Locator("[id^=game-]").AllAsync()
+            let! id = allGames.[allGames.Count - 1].GetAttributeAsync("id")
 
             // Player 1 makes a move (claims X)
             let firstSquare = this.Page.Locator($"#{id} [data-on\\:click]").First

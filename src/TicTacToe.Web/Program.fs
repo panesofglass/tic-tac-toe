@@ -122,7 +122,7 @@ let createInitialGames (app: IApplicationBuilder) =
         // Create 6 initial games
         for _ in 1..6 do
             let (gameId, game) = supervisor.CreateGame()
-            Handlers.subscribeToGame gameId game assignmentManager
+            Handlers.subscribeToGame gameId game assignmentManager supervisor
     ) |> ignore
     app
 

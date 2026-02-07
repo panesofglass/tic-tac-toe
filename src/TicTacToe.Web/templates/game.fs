@@ -15,221 +15,155 @@ let private allPositions =
       BottomCenter
       BottomRight ]
 
-let private getSquareValue (gameState: GameState) (position: SquarePosition) : string =
-    match gameState.TryGetValue(position) with
-    | true, Taken player -> player.ToString()
-    | _ -> ""
+// ============================================================================
+// Active Patterns
+// ============================================================================
 
-let private isValidMove (validMoves: SquarePosition array) (position: SquarePosition) : bool =
-    validMoves |> Array.contains position
+/// Extract game state from any MoveResult
+let private (|State|) = function
+    | XTurn(s, _) | OTurn(s, _) | Won(s, _) | Draw s | Error(s, _) -> s
 
-/// Parameters for rendering a single square
-type private SquareRenderContext =
-    { gameId: string
-      gameState: GameState
-      validMoves: SquarePosition array
-      currentPlayer: Player option
-      viewerRole: PlayerRole
-      assignment: PlayerAssignment option }
+/// Resolve the viewer's player token from game context.
+/// Returns Some X/O if viewer can act as that player, None for spectators.
+let private resolveViewer (assignment: PlayerAssignment option) (userId: string) (result: MoveResult) =
+    match assignment with
+    | Some { PlayerXId = Some xId } when xId = userId -> Some X
+    | Some { PlayerOId = Some oId } when oId = userId -> Some O
+    | Some { PlayerXId = Some _; PlayerOId = Some _ } -> None
+    | _ ->
+        match result with
+        | XTurn _ -> Some X
+        | OTurn _ -> Some O
+        | _ -> None
+
+/// Decompose (MoveResult, viewerPlayer) into rendering modes.
+/// CanMove: viewer is the active player — show clickable valid-move squares.
+/// Watching: game in progress but not viewer's turn — static board.
+/// Finished: game is over — static board.
+let private (|CanMove|Watching|Finished|) = function
+    | XTurn(_, moves), Some X -> CanMove(X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
+    | OTurn(_, moves), Some O -> CanMove(O, moves |> Array.map (fun (OPos pos) -> pos), "O's turn")
+    | XTurn _, _               -> Watching(Some X, "X's turn")
+    | OTurn _, _               -> Watching(Some O, "O's turn")
+    | Won(_, player), _        -> Finished $"{player} wins!"
+    | Draw _, _                -> Finished "It's a draw!"
+    | Error(_, msg), _         -> Finished $"Error: {msg}"
+
+// ============================================================================
+// Public Utilities
+// ============================================================================
 
 /// Display first 8 characters of a user ID, or a placeholder if not assigned
 let shortUserId (id: string option) (placeholder: string) =
     id |> Option.map (fun s -> s.[..7]) |> Option.defaultValue placeholder
 
-/// Check if game has any moves or assigned players
-let hasMovesOrPlayers (result: MoveResult) (assignment: PlayerAssignment option) =
+/// Check if game has activity (moves made or players assigned)
+let hasGameActivity (result: MoveResult) (assignment: PlayerAssignment option) =
     match result with
-    | XTurn(state, _) ->
-        // Check if board has any moves (any Taken squares) or if players assigned
-        let hasMoves = state.Values |> Seq.exists (function Taken _ -> true | Empty -> false)
-        let hasPlayers = assignment.IsSome && (assignment.Value.PlayerXId.IsSome || assignment.Value.PlayerOId.IsSome)
+    | Won _ | Draw _ | Error _ -> true
+    | XTurn(state, _) | OTurn(state, _) ->
+        let hasMoves = state.Values |> Seq.exists (function Taken _ -> true | _ -> false)
+        let hasPlayers =
+            match assignment with
+            | Some { PlayerXId = Some _ } | Some { PlayerOId = Some _ } -> true
+            | _ -> false
         hasMoves || hasPlayers
-    | OTurn _ | Won _ | Draw _ | Error _ -> true  // Always has activity
 
-/// Check if user can reset the game
-/// Assigned players can always reset; all authenticated users can reset when gameCount > 6
-let canReset hasActivity gameCount role =
-    match role with
-    | PlayerX | PlayerO -> hasActivity  // Assigned players always see reset if game has activity
-    | Spectator | UnassignedX | UnassignedO -> gameCount > 6  // Non-assigned see reset when > 6 boards
+// ============================================================================
+// Private Rendering
+// ============================================================================
 
-/// Check if user can delete the game
-/// Assigned players can always delete; all authenticated users can delete when gameCount > 6
-let canDelete gameCount role =
-    match role with
-    | PlayerX | PlayerO -> gameCount > 6  // Assigned players can delete when > 6
-    | Spectator | UnassignedX | UnassignedO -> gameCount > 6  // Non-assigned can delete when > 6
+/// Render a clickable square for a valid move
+let private renderClickableSquare gameId (player: Player) (position: SquarePosition) =
+    let posStr = position.ToString()
+    let playerStr = player.ToString()
+    button(class' = "square square-clickable", type' = "button")
+        .attr("data-on:click", sprintf "$gameId = '%s'; $player = '%s'; $position = '%s'; @post('/games/%s')" gameId playerStr posStr gameId) {
+        span(class' = "preview") { playerStr }
+    }
+    :> HtmlElement
+
+/// Render a static square (taken or empty)
+let private renderStaticSquare (state: GameState) (position: SquarePosition) =
+    let content =
+        match state.TryGetValue(position) with
+        | true, Taken player -> span(class' = "player") { player.ToString() }
+        | _ -> span(class' = "empty") { raw "·" }
+    div(class' = "square") { content }
+    :> HtmlElement
 
 /// Render the player legend showing X and O assignments
-let renderLegend (assignment: PlayerAssignment option) (currentPlayer: Player option) =
-    let xLabel = assignment |> Option.bind (fun a -> a.PlayerXId) |> fun id -> shortUserId id "Waiting for player..."
-    let oLabel = assignment |> Option.bind (fun a -> a.PlayerOId) |> fun id -> shortUserId id "Waiting for player..."
-    let xClass = if currentPlayer = Some X then "legend-active" else ""
-    let oClass = if currentPlayer = Some O then "legend-active" else ""
+let private renderLegend (assignment: PlayerAssignment option) (currentPlayer: Player option) =
+    let xLabel =
+        assignment |> Option.bind (fun a -> a.PlayerXId) |> fun id -> shortUserId id "Waiting for player..."
+    let oLabel =
+        assignment |> Option.bind (fun a -> a.PlayerOId) |> fun id -> shortUserId id "Waiting for player..."
+    let legendClass player =
+        match currentPlayer with
+        | Some p when p = player -> "legend-active"
+        | _ -> ""
     div(class' = "legend") {
-        span(class' = xClass) { $"X: {xLabel}" }
-        span(class' = oClass) { $"O: {oLabel}" }
+        span(class' = legendClass X) { $"X: {xLabel}" }
+        span(class' = legendClass O) { $"O: {oLabel}" }
     }
 
-let private renderSquare (ctx: SquareRenderContext) (position: SquarePosition) =
-    let value = getSquareValue ctx.gameState position
-    let positionStr = position.ToString()
-    let isEmpty = System.String.IsNullOrEmpty(value)
-    let canMove = isEmpty && isValidMove ctx.validMoves position
-
-    // Check if game is unassigned (new game with no claimed roles)
-    let isGameUnassigned =
-        match ctx.assignment with
-        | None -> true
-        | Some a -> a.PlayerXId.IsNone && a.PlayerOId.IsNone
-
-    // Check if viewer can make a move:
-    // 1. For unassigned games: always allow (anyone can claim a role)
-    // 2. For assigned games: only if viewer is the current player
-    let canViewerMove =
-        if isGameUnassigned then
-            true  // Unassigned game: allow anyone to move (to claim role)
+/// Render control buttons (reset/delete) based on viewer assignment and game state
+let private renderControls gameId viewerPlayer assignment gameCount activity =
+    let resetEnabled, deleteEnabled =
+        match viewerPlayer, assignment with
+        | Some X, Some { PlayerXId = Some _ }
+        | Some O, Some { PlayerOId = Some _ } ->
+            (activity, true)
+        | _ ->
+            (gameCount > 6, gameCount > 6)
+    div(class' = "controls") {
+        if resetEnabled then
+            button(class' = "reset-game-btn", type' = "button")
+                .attr("data-on:click", sprintf "@post('/games/%s/reset')" gameId) { "Reset Game" }
         else
-            // Assigned game: only assigned players on their turn can move
-            match (ctx.viewerRole, ctx.currentPlayer) with
-            | (PlayerX, Some X) | (PlayerO, Some O) -> true
-            | _ -> false
-
-    if canMove && canViewerMove then
-        let playerStr = ctx.currentPlayer.Value.ToString()
-        // Clickable button - sets signals in click handler then posts to game-specific endpoint
-        button(class' = "square square-clickable", type' = "button")
-            .attr("data-on:click", sprintf "$gameId = '%s'; $player = '%s'; $position = '%s'; @post('/games/%s')" ctx.gameId playerStr positionStr ctx.gameId) {
-            // Show preview of move on hover
-            span(class' = "preview") { playerStr }
-        }
-        :> HtmlElement
-    else
-        // Static cell - either taken or not player's turn
-        div(class' = "square") {
-            if not (System.String.IsNullOrEmpty(value)) then
-                span(class' = "player") { value }
-            else
-                span(class' = "empty") { raw "·" }
-        }
-        :> HtmlElement
-
-/// Render with full context for button enable/disable logic
-let renderGameBoardWithContext (gameId: string) (result: MoveResult) (userRole: PlayerRole) (assignment: PlayerAssignment option) (gameCount: int) =
-    let (gameState, currentPlayer, validMoves, status) =
-        match result with
-        | XTurn(state, moves) -> (state, Some X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
-        | OTurn(state, moves) -> (state, Some O, moves |> Array.map (fun (OPos pos) -> pos), "O's turn")
-        | Won(state, player) -> (state, None, [||], $"{player} wins!")
-        | Draw state -> (state, None, [||], "It's a draw!")
-        | Error(state, msg) -> (state, None, [||], $"Error: {msg}")
-
-    let isGameOver = currentPlayer.IsNone
-    let hasActivity = hasMovesOrPlayers result assignment
-    let resetEnabled = canReset hasActivity gameCount userRole
-    let deleteEnabled = canDelete gameCount userRole
-
-    div(id = $"game-{gameId}", class' = "game-board")
-        .attr("data-signals", sprintf "{gameId: '%s', player: '', position: ''}" gameId) {
-        // Game status
-        div(class' = "status") { h2() { status } }
-
-        // Game board - 3x3 grid
-        div(class' = "board") {
-            let ctx = { gameId = gameId; gameState = gameState; validMoves = validMoves; currentPlayer = currentPlayer; viewerRole = userRole; assignment = assignment }
-            for position in allPositions do
-                renderSquare ctx position
-        }
-
-        // Player legend
-        renderLegend assignment currentPlayer
-
-        // Game controls - Reset and Delete buttons
-        div(class' = "controls") {
-            if resetEnabled then
-                button(class' = "reset-game-btn", type' = "button")
-                    .attr("data-on:click", sprintf "@post('/games/%s/reset')" gameId) {
-                    "Reset Game"
-                }
-            else
-                button(class' = "reset-game-btn", type' = "button")
-                    .attr("disabled", "disabled") {
-                    "Reset Game"
-                }
-            if deleteEnabled then
-                button(class' = "delete-game-btn", type' = "button")
-                    .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) {
-                    "Delete Game"
-                }
-            else
-                button(class' = "delete-game-btn", type' = "button")
-                    .attr("disabled", "disabled") {
-                    "Delete Game"
-                }
-        }
+            button(class' = "reset-game-btn", type' = "button")
+                .attr("disabled", "disabled") { "Reset Game" }
+        if deleteEnabled then
+            button(class' = "delete-game-btn", type' = "button")
+                .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) { "Delete Game" }
+        else
+            button(class' = "delete-game-btn", type' = "button")
+                .attr("disabled", "disabled") { "Delete Game" }
     }
 
-/// Render game board for SSE broadcast (minimal context - server validates actions)
-/// Uses simplified enable logic: reset enabled if game has activity, delete always disabled
-let renderGameBoardForBroadcast (gameId: string) (result: MoveResult) (assignment: PlayerAssignment option) =
-    let (gameState, currentPlayer, validMoves, status) =
-        match result with
-        | XTurn(state, moves) -> (state, Some X, moves |> Array.map (fun (XPos pos) -> pos), "X's turn")
-        | OTurn(state, moves) -> (state, Some O, moves |> Array.map (fun (OPos pos) -> pos), "O's turn")
-        | Won(state, player) -> (state, None, [||], $"{player} wins!")
-        | Draw state -> (state, None, [||], "It's a draw!")
-        | Error(state, msg) -> (state, None, [||], $"Error: {msg}")
+// ============================================================================
+// Main Render Function
+// ============================================================================
 
-    // For broadcast: enable reset if game has any activity (server validates authorization)
-    let hasActivity =
-        match result with
-        | XTurn(state, _) -> state.Values |> Seq.exists (function Taken _ -> true | Empty -> false)
-        | _ -> true
-
+/// Render a complete game board, personalized for the given viewer.
+/// Resolves the viewer's player token internally from assignment + userId.
+let renderGameBoard (gameId: string) (result: MoveResult) (userId: string) (assignment: PlayerAssignment option) (gameCount: int) =
+    let (State state) = result
+    let viewerPlayer = resolveViewer assignment userId result
+    let activity = hasGameActivity result assignment
+    let renderSquare, currentPlayer, status =
+        match (result, viewerPlayer) with
+        | CanMove(player, validMoves, status) ->
+            let render pos =
+                if validMoves |> Array.contains pos then
+                    renderClickableSquare gameId player pos
+                else
+                    renderStaticSquare state pos
+            (render, Some player, status)
+        | Watching(cp, status) ->
+            (renderStaticSquare state, cp, status)
+        | Finished status ->
+            (renderStaticSquare state, None, status)
     div(id = $"game-{gameId}", class' = "game-board")
         .attr("data-signals", sprintf "{gameId: '%s', player: '', position: ''}" gameId) {
-        // Game status
         div(class' = "status") { h2() { status } }
-
-        // Game board - 3x3 grid
         div(class' = "board") {
-            let ctx = { gameId = gameId; gameState = gameState; validMoves = validMoves; currentPlayer = currentPlayer; viewerRole = Spectator; assignment = assignment }
             for position in allPositions do
-                renderSquare ctx position
+                renderSquare position
         }
-
-        // Player legend
         renderLegend assignment currentPlayer
-
-        // Game controls - Reset and Delete buttons enabled if activity (server validates authorization)
-        div(class' = "controls") {
-            if hasActivity then
-                button(class' = "reset-game-btn", type' = "button")
-                    .attr("data-on:click", sprintf "@post('/games/%s/reset')" gameId) {
-                    "Reset Game"
-                }
-            else
-                button(class' = "reset-game-btn", type' = "button")
-                    .attr("disabled", "disabled") {
-                    "Reset Game"
-                }
-            if hasActivity then
-                button(class' = "delete-game-btn", type' = "button")
-                    .attr("data-on:click", sprintf "@delete('/games/%s')" gameId) {
-                    "Delete Game"
-                }
-            else
-                button(class' = "delete-game-btn", type' = "button")
-                    .attr("disabled", "disabled") {
-                    "Delete Game"
-                }
-        }
+        renderControls gameId viewerPlayer assignment gameCount activity
     }
-
-/// Render the current game state from a MoveResult with game ID for multi-game support
-/// Original signature maintained for backward compatibility
-let renderGameBoard (gameId: string) (result: MoveResult) =
-    renderGameBoardWithContext gameId result UnassignedX None 6
 
 /// CSS styles for the game board
 let gameStyles =

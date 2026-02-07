@@ -5,14 +5,6 @@ module TicTacToe.Web.Model
 
 open System
 
-/// Represents the possible roles a user can have in relation to a game
-type PlayerRole =
-    | PlayerX // Assigned as X
-    | PlayerO // Assigned as O
-    | Spectator // Both slots filled, user is neither
-    | UnassignedX // X slot open (first to move gets it)
-    | UnassignedO // O slot open (next to move gets it)
-
 /// Reasons why a move was rejected
 type RejectionReason =
     | NotYourTurn // Correct player, wrong turn
@@ -22,7 +14,7 @@ type RejectionReason =
 
 /// Result of validating whether a user can make a move
 type MoveValidationResult =
-    | Allowed of PlayerRole
+    | Allowed
     | Rejected of RejectionReason
 
 /// Tracks which authenticated user is assigned to which role (X or O) in a specific game
@@ -39,7 +31,6 @@ let createAssignment gameId =
 
 /// Messages for the PlayerAssignmentManager MailboxProcessor
 type PlayerAssignmentMessage =
-    | GetRole of gameId: string * userId: string * AsyncReplyChannel<PlayerRole>
     | TryAssignAndValidate of
         gameId: string *
         userId: string *
@@ -60,23 +51,6 @@ type PlayerAssignmentManager() =
                     let! msg = inbox.Receive()
 
                     match msg with
-                    | GetRole(gameId, userId, reply) ->
-                        let assignment =
-                            state |> Map.tryFind gameId |> Option.defaultValue (createAssignment gameId)
-
-                        let role =
-                            match assignment.PlayerXId, assignment.PlayerOId with
-                            | None, None -> UnassignedX
-                            | Some xId, None when xId = userId -> PlayerX
-                            | Some _, None -> UnassignedO
-                            | Some xId, Some _ when xId = userId -> PlayerX
-                            | Some _, Some oId when oId = userId -> PlayerO
-                            | Some _, Some _ -> Spectator
-                            | None, Some _ -> UnassignedX // Edge case: shouldn't happen but handle gracefully
-
-                        reply.Reply(role)
-                        return! loop state
-
                     | TryAssignAndValidate(gameId, userId, isXTurn, reply) ->
                         let assignment =
                             state |> Map.tryFind gameId |> Option.defaultValue (createAssignment gameId)
@@ -89,7 +63,7 @@ type PlayerAssignmentManager() =
                                     { assignment with
                                         PlayerXId = Some userId }
 
-                                Allowed PlayerX, updated
+                                Allowed, updated
 
                             // O slot open, it's O's turn, and user is not X - assign user as O
                             | Some xId, None, false when xId <> userId ->
@@ -97,13 +71,13 @@ type PlayerAssignmentManager() =
                                     { assignment with
                                         PlayerOId = Some userId }
 
-                                Allowed PlayerO, updated
+                                Allowed, updated
 
                             // User is X and it's X's turn - allow
-                            | Some xId, _, true when xId = userId -> Allowed PlayerX, assignment
+                            | Some xId, _, true when xId = userId -> Allowed, assignment
 
                             // User is O and it's O's turn - allow
-                            | _, Some oId, false when oId = userId -> Allowed PlayerO, assignment
+                            | _, Some oId, false when oId = userId -> Allowed, assignment
 
                             // User is X but it's O's turn - not your turn
                             | Some xId, Some _, false when xId = userId -> Rejected NotYourTurn, assignment
@@ -138,10 +112,6 @@ type PlayerAssignmentManager() =
                 }
 
             loop Map.empty)
-
-    /// Get the role of a user in a game
-    member _.GetRole(gameId: string, userId: string) =
-        agent.PostAndReply(fun reply -> GetRole(gameId, userId, reply))
 
     /// Try to assign a player and validate the move
     member _.TryAssignAndValidate(gameId: string, userId: string, isXTurn: bool) =

@@ -146,7 +146,7 @@ let home (ctx: HttpContext) =
 let sse (ctx: HttpContext) =
     task {
         let userId = ctx.User.TryGetUserId() |> Option.defaultValue "anonymous"
-        let myChannel = subscribe userId
+        let (myChannel, subscription) = subscribe userId
         let supervisor = ctx.RequestServices.GetRequiredService<GameSupervisor>()
         let assignmentManager = ctx.RequestServices.GetRequiredService<PlayerAssignmentManager>()
 
@@ -175,7 +175,7 @@ let sse (ctx: HttpContext) =
         | :? ChannelClosedException -> ()
         | _ -> ()
 
-        unsubscribe myChannel
+        subscription.Dispose()
     }
 
 

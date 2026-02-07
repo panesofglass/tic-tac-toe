@@ -1,5 +1,7 @@
 module TicTacToe.Web.SseBroadcast
 
+open System
+open System.Collections.Concurrent
 open System.Threading.Channels
 open Microsoft.AspNetCore.Http
 open Frank.Datastar
@@ -12,26 +14,41 @@ type SseEvent =
     | RemoveElement of selector: string
     | PatchSignals of json: string
 
-/// Thread-safe collection of subscriber channels
-let private subscribersLock = obj ()
-let private subscribers = ResizeArray<Channel<SseEvent>>()
+/// Thread-safe collection of subscriber channels with user identity
+let private subscribers = ConcurrentDictionary<Guid, string * Channel<SseEvent>>()
 
-/// Create a new subscriber channel for an SSE connection
-let subscribe () : Channel<SseEvent> =
+/// Create a new subscriber channel for an SSE connection with user identity
+/// Returns a tuple of (Channel, IDisposable) where disposing unsubscribes and completes the channel
+let subscribe (userId: string) : Channel<SseEvent> * IDisposable =
     let channel = Channel.CreateUnbounded<SseEvent>()
-    lock subscribersLock (fun () -> subscribers.Add(channel))
-    channel
+    let id = Guid.NewGuid()
+    subscribers.TryAdd(id, (userId, channel)) |> ignore
 
-/// Remove a subscriber channel when SSE connection closes
-let unsubscribe (channel: Channel<SseEvent>) =
-    lock subscribersLock (fun () -> subscribers.Remove(channel) |> ignore)
-    channel.Writer.Complete()
+    let disposable =
+        { new IDisposable with
+            member __.Dispose() =
+                match subscribers.TryRemove(id) with
+                | true, (_, ch) -> ch.Writer.Complete()
+                | false, _ -> () }
+
+    (channel, disposable)
 
 /// Broadcast an event to ALL active SSE connections
 let broadcast (event: SseEvent) =
-    lock subscribersLock (fun () ->
-        for ch in subscribers do
-            ch.Writer.TryWrite(event) |> ignore)
+    for KeyValue(_, (_, ch)) in subscribers do
+        ch.Writer.TryWrite(event) |> ignore
+
+/// Send an event to a specific user's SSE connections
+let sendToUser (userId: string) (event: SseEvent) =
+    for KeyValue(_, (uid, ch)) in subscribers do
+        if uid = userId then
+            ch.Writer.TryWrite(event) |> ignore
+
+/// Broadcast an event per role: maps each subscriber's userId to the appropriate event
+let broadcastPerRole (renderForRole: string -> SseEvent) =
+    for KeyValue(_, (userId, ch)) in subscribers do
+        let event = renderForRole userId
+        ch.Writer.TryWrite(event) |> ignore
 
 /// Helper to write SSE events to response
 let writeSseEvent (ctx: HttpContext) (event: SseEvent) =

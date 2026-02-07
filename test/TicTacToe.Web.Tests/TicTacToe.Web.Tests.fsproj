@@ -20,6 +20,7 @@
     <Compile Include="ResetGameTests.fs" />
     <Compile Include="InitialGamesTests.fs" />
     <Compile Include="UserIdentityTests.fs" />
+    <Compile Include="AffordanceTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

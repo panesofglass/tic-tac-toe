@@ -62,10 +62,11 @@ type HomePageTests() =
     [<Test>]
     member this.``Empty board shows X turn status``() : Task =
         task {
-            // Check the first initial game
-            let game = this.Page.Locator(".game-board").First
+            // Create a fresh game to ensure clean state
+            do! this.CreateGame()
+            let game = this.Page.Locator(".game-board").Last
             let! statusText = game.Locator(".status").TextContentAsync()
-            Assert.That(statusText, Does.Contain("X's turn"), "Initial status should show X's turn")
+            Assert.That(statusText, Does.Contain("X's turn"), "Fresh game should show X's turn")
         }
 
     [<Test>]

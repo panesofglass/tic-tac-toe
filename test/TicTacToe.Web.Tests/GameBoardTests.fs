@@ -7,7 +7,6 @@ open Oxpecker.ViewEngine
 open TicTacToe.Web.templates.game
 open TicTacToe.Model
 open TicTacToe.Web.Model
-
 // Helper to create a game state with specific moves
 let createGameStateWith (moves: (SquarePosition * Player) list) =
     let mutable gameState = Map.empty<SquarePosition, SquareState>
@@ -35,12 +34,14 @@ let createErrorResult gameState message = Error(gameState, message)
 
 let testGameId = "test-game-123"
 
+/// Render as an unassigned viewer who can play (derives player from whose turn it is)
 let renderGameBoardToString result =
-    let element = renderGameBoard testGameId result
+    let element = renderGameBoard testGameId result "" None 6
     Render.toString element
 
+/// Render as a spectator (no specific viewer)
 let renderBroadcastToString result assignment =
-    let element = renderGameBoardForBroadcast testGameId result assignment
+    let element = renderGameBoard testGameId result "" assignment 6
     Render.toString element
 
 [<Tests>]
@@ -110,7 +111,7 @@ let tests =
               Expect.stringContains html "X wins!" "Should show X win message"
               Expect.stringContains html "Delete Game" "Should show delete game button"
               Expect.stringContains html "delete-game-btn" "Should have delete game button class"
-              // renderGameBoard uses UnassignedX role with gameCount=6, so delete is disabled
+              // renderGameBoard with empty userId and no assignment uses gameCount<=6, so delete is disabled
               Expect.stringContains html "disabled" "Delete button should be disabled when rendered without user context"
               Expect.isFalse (html.Contains("square-clickable")) "Should not have any clickable squares"
 

@@ -1,6 +1,6 @@
 # Tic-Tac-Toe Web Application
 
-A multi-player web-based Tic-Tac-Toe game built with F# and ASP.NET Core, featuring real-time updates and concurrent game support.
+A multi-player web-based Tic-Tac-Toe game built with F# and ASP.NET Core, featuring real-time updates and concurrent game support, inspired by [Scott Wlaschin](https://scottwlaschin.com/)'s [Enterprise Tic-Tac-Toe](https://fsharpforfunandprofit.com/ettt/).
 
 ## Features
 

@@ -101,15 +101,16 @@ type RestApiTests() =
         }
 
     [<Test>]
-    member _.``POST /games/{id} without auth returns 401``() : Task =
+    member this.``POST /games/{id} without auth is challenged``() : Task =
         task {
             // First create a game with the authenticated client
+            do! this.EnsureAuthenticated()
             let! createResponse = client.PostAsync("/games", null)
             let gameUrl = createResponse.Headers.Location.ToString()
             let gameId = gameUrl.Substring("/games/".Length)
 
-            // Now create a fresh client without cookies
-            use freshHandler = new HttpClientHandler(CookieContainer = CookieContainer())
+            // Now create a fresh client without cookies (no auto-redirect)
+            use freshHandler = new HttpClientHandler(CookieContainer = CookieContainer(), AllowAutoRedirect = false)
             use freshClient = new HttpClient(freshHandler, BaseAddress = Uri(baseUrl))
 
             let signals = sprintf """{"gameId":"%s","player":"X","position":"TopLeft"}""" gameId
@@ -120,7 +121,51 @@ type RestApiTests() =
 
             let! response = freshClient.SendAsync(request)
 
-            Assert.That(int response.StatusCode, Is.EqualTo(401), "Should return 401 without authentication")
+            Assert.That(int response.StatusCode, Is.AnyOf(302, 401), "Should be challenged without authentication")
+        }
+
+    [<Test>]
+    member _.``POST /games without auth is challenged``() : Task =
+        task {
+            // Create a fresh client without cookies (no auth)
+            use freshHandler = new HttpClientHandler(CookieContainer = CookieContainer(), AllowAutoRedirect = false)
+            use freshClient = new HttpClient(freshHandler, BaseAddress = Uri(baseUrl))
+
+            let! response = freshClient.PostAsync("/games", null)
+
+            // Should be challenged (302 redirect to /login or 401)
+            Assert.That(int response.StatusCode, Is.AnyOf(302, 401), "Should be challenged without authentication")
+        }
+
+    [<Test>]
+    member _.``DELETE /games/{id} without auth is challenged``() : Task =
+        task {
+            // Create a fresh client without cookies (no auth)
+            use freshHandler = new HttpClientHandler(CookieContainer = CookieContainer(), AllowAutoRedirect = false)
+            use freshClient = new HttpClient(freshHandler, BaseAddress = Uri(baseUrl))
+
+            let! response = freshClient.DeleteAsync("/games/some-game-id")
+
+            // Should be challenged (302 redirect to /login or 401)
+            Assert.That(int response.StatusCode, Is.AnyOf(302, 401), "Should be challenged without authentication")
+        }
+
+    [<Test>]
+    member this.``GET /games/{id} without auth is challenged``() : Task =
+        task {
+            // Ensure authenticated, then create a game
+            do! this.EnsureAuthenticated()
+            let! createResponse = client.PostAsync("/games", null)
+            let gameUrl = createResponse.Headers.Location.ToString()
+
+            // Create a fresh client without cookies (no auth)
+            use freshHandler = new HttpClientHandler(CookieContainer = CookieContainer(), AllowAutoRedirect = false)
+            use freshClient = new HttpClient(freshHandler, BaseAddress = Uri(baseUrl))
+
+            let! response = freshClient.GetAsync(gameUrl)
+
+            // Should be challenged (302 redirect to /login or 401)
+            Assert.That(int response.StatusCode, Is.AnyOf(302, 401), "Should be challenged without authentication")
         }
 
     // ============================================================================

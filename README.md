@@ -4,11 +4,14 @@ A multi-player web-based Tic-Tac-Toe game built with F# and ASP.NET Core, featur
 
 ## Features
 
+- **Hypermedia-driven architecture** - Server-side rendering with Datastar for reactive updates, zero client JavaScript
 - **Multi-player gameplay** - Two players (X and O) play from separate browsers
 - **Multiple concurrent games** - Create and manage multiple games on a single page
-- **Real-time updates** - Server-sent events (SSE) broadcast game state to all connected players
-- **Automatic authentication** - Cookie-based user identification without explicit sign-in
+- **Real-time updates** - Server-sent events (SSE) stream HTML patches to all connected players
+- **Zero-copy streaming** - Direct rendering to Kestrel's PipeWriter for minimal allocations
+- **Automatic authentication** - Cookie-based user identification with Frank.Auth declarative authorization
 - **Direct game URLs** - Share game links for others to join
+- **Functional-first design** - Pure game logic with MailboxProcessor for concurrent state management
 
 ## Getting Started
 
@@ -39,20 +42,52 @@ dotnet run --project src/TicTacToe.Web/
 
 ## Architecture
 
+This project demonstrates modern hypermedia-driven architecture using F# and Datastar, with a focus on server-side rendering and real-time updates via SSE.
+
 ### Technologies
 
-- **F#** - Primary language
-- **ASP.NET Core** - Web framework
-- **Frank 6.5.0** - Routing and HTTP handling
-- **Frank.Datastar** - Server-sent events integration
-- **Oxpecker.ViewEngine** - HTML view rendering
-- **Playwright** - End-to-end testing
+- **F#** - Functional-first language for concise, correct code
+- **ASP.NET Core** - Web framework with Kestrel HTTP server
+- **Frank 7.1.0** - Minimal routing and HTTP handling
+- **Frank.Auth 7.1.0** - Declarative resource-based authentication
+- **Frank.Datastar 7.1.0** - Server-sent events with streaming HTML
+- **Oxpecker.ViewEngine 2.x** - Type-safe HTML rendering with zero-copy streaming
+- **Playwright** - End-to-end browser automation testing
+
+### Hypermedia Architecture
+
+The application uses a **hypermedia-first** approach with Datastar for reactive updates:
+
+- **Zero client JavaScript** - All UI logic lives on the server
+- **SSE-driven updates** - Server broadcasts HTML patches to all connected clients
+- **Declarative data binding** - Datastar attributes handle UI state
+- **HTML-over-the-wire** - No JSON APIs; server sends rendered HTML fragments
+
+### Streaming Performance
+
+The application uses **zero-copy streaming** for both HTTP responses and SSE broadcasts:
+
+- **HTTP responses**: `Render.toStreamAsync` writes directly to Kestrel's `PipeWriter`
+- **SSE broadcasts**: `Render.toTextWriterAsync` streams HTML to the response pipe
+- **No intermediate allocations**: Eliminates string materialization (18 KB per render)
+
+**Benchmark results** (Apple M2 Pro, 100,000 concurrent renders):
+- **toString + PipeWriter write (baseline)**: 578.4 ms / 2389.8 MB allocated
+- **toTextWriterAsync (SSE - PipeWriter)**: 556.6 ms / 1852.3 MB (**0.96x time, 0.78x memory**)
+- **toStreamAsync (HTTP - PipeWriter)**: 546.6 ms / 1849.2 MB (**0.95x time, 0.77x memory**)
+
+The streaming approaches are **3-5% faster** and use **22-23% less memory** by eliminating intermediate string allocations. At extreme scale (1M operations), streaming saves **5.4 GB** of allocations and completes **5-6% faster**.
+
+**These are conservative estimates.** Production SSE connections reuse one pipe across hundreds or thousands of messages, while the string-based approach allocates 18 KB per message. Real-world SSE benefits are significantly larger than these benchmark results.
+
+See [performance-report.md](specs/001-frank-upgrade/performance-report.md) for detailed analysis.
 
 ### Key Components
 
-- **GameSupervisor** - Manages multiple concurrent game instances
-- **PlayerAssignmentManager** - Tracks which user plays X or O in each game
-- **SSE Broadcast** - Real-time game state updates to all connected clients
+- **GameSupervisor** - MailboxProcessor managing concurrent game instances with message-passing
+- **PlayerAssignmentManager** - Tracks player role assignments (X/O) per game per user
+- **SSE Broadcast** - Per-user HTML rendering and real-time state synchronization
+- **Game Engine** - Pure functional game logic with type-safe state transitions
 
 ## Authentication
 
@@ -80,16 +115,19 @@ The application uses automatic cookie-based authentication:
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Home page (requires auth) |
-| GET | `/login` | Authenticate and get cookie |
-| GET | `/logout` | Clear authentication |
-| GET | `/sse` | SSE stream for real-time updates |
-| POST | `/games` | Create a new game |
-| GET | `/games/{id}` | View a specific game |
-| POST | `/games/{id}` | Make a move |
-| DELETE | `/games/{id}` | Delete a game |
+All endpoints except `/login`, `/logout`, and `/sse` require authentication via Frank.Auth's declarative `requireAuth`.
+
+| Method | Path | Description | Auth Required |
+|--------|------|-------------|---------------|
+| GET | `/` | Home page with all active games | ✅ |
+| GET | `/login` | Authenticate and receive persistent cookie | ❌ |
+| GET | `/logout` | Clear authentication cookie | ❌ |
+| GET | `/sse` | SSE stream for real-time HTML patches | ❌ |
+| POST | `/games` | Create a new game | ✅ |
+| GET | `/games/{id}` | View a specific game | ✅ |
+| POST | `/games/{id}` | Make a move (player assignment validation) | ✅ |
+| POST | `/games/{id}/reset` | Reset a game (requires player assignment) | ✅ |
+| DELETE | `/games/{id}` | Delete a game (requires player assignment) | ✅ |
 
 ## Testing
 

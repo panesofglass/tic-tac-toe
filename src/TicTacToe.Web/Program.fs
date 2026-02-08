@@ -9,32 +9,22 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Frank.Builder
+open Frank.Auth
 open Frank.Datastar
 open TicTacToe.Web
 open TicTacToe.Web.Model
 open TicTacToe.Engine
 open TicTacToe.Web.Extensions
 
+let configureLogging (builder: ILoggingBuilder) =
+    builder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning) |> ignore
+    builder.AddFilter("TicTacToe.Web.Auth", LogLevel.Information) |> ignore
+    builder
+
 let configureServices (services: IServiceCollection) =
     services.AddRouting().AddHttpContextAccessor() |> ignore
 
-    services
-        .AddAuthorization()
-        .AddAntiforgery()
-        .AddAuthentication(fun options ->
-            options.DefaultScheme <- CookieAuthenticationDefaults.AuthenticationScheme
-            options.DefaultAuthenticateScheme <- CookieAuthenticationDefaults.AuthenticationScheme
-            options.DefaultChallengeScheme <- CookieAuthenticationDefaults.AuthenticationScheme
-            options.DefaultSignInScheme <- CookieAuthenticationDefaults.AuthenticationScheme)
-        .AddCookie(fun options ->
-            options.Cookie.Name <- "TicTacToe.User"
-            options.Cookie.HttpOnly <- true
-            options.Cookie.SameSite <- SameSiteMode.Strict
-            options.Cookie.SecurePolicy <- CookieSecurePolicy.SameAsRequest
-            options.ExpireTimeSpan <- TimeSpan.FromDays(30.0)
-            options.SlidingExpiration <- true
-            options.LoginPath <- "/login")
-    |> ignore
+    services.AddAntiforgery() |> ignore
 
     services
         .AddSingleton<GameSupervisor>(fun _ -> createGameSupervisor ())
@@ -83,7 +73,8 @@ let debug =
 let home =
     resource "/" {
         name "Home"
-        get (Handlers.requiresAuth Handlers.home)
+        requireAuth
+        get Handlers.home
     }
 
 let sse =
@@ -95,12 +86,14 @@ let sse =
 let games =
     resource "/games" {
         name "Games"
+        requireAuth
         post Handlers.createGame
     }
 
 let gameById =
     resource "/games/{id}" {
         name "GameById"
+        requireAuth
         get Handlers.getGame
         post Handlers.makeMove
         delete Handlers.deleteGame
@@ -109,21 +102,27 @@ let gameById =
 let gameReset =
     resource "/games/{id}/reset" {
         name "GameReset"
-        post (Handlers.requiresAuth Handlers.resetGame)
+        requireAuth
+        post Handlers.resetGame
     }
 
 /// Create initial games on application startup
 let createInitialGames (app: IApplicationBuilder) =
-    let lifetime = app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
+    let lifetime =
+        app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>()
+
     let supervisor = app.ApplicationServices.GetRequiredService<GameSupervisor>()
-    let assignmentManager = app.ApplicationServices.GetRequiredService<PlayerAssignmentManager>()
+
+    let assignmentManager =
+        app.ApplicationServices.GetRequiredService<PlayerAssignmentManager>()
 
     lifetime.ApplicationStarted.Register(fun () ->
         // Create 6 initial games
         for _ in 1..6 do
             let (gameId, game) = supervisor.CreateGame()
-            Handlers.subscribeToGame gameId game assignmentManager supervisor
-    ) |> ignore
+            Handlers.subscribeToGame gameId game assignmentManager supervisor)
+    |> ignore
+
     app
 
 [<EntryPoint>]
@@ -133,18 +132,18 @@ let main args =
 
         service configureServices
 
-        logging (fun builder ->
-            builder.AddFilter("Microsoft.AspNetCore", LogLevel.Warning) |> ignore
-            builder.AddFilter("TicTacToe.Web.Auth", LogLevel.Information) |> ignore
-            builder)
+        logging configureLogging
 
-        plugWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
-        plugWhenNot isDevelopment (fun app -> ExceptionHandlerExtensions.UseExceptionHandler(app, "/error", true))
+        plugBeforeRoutingWhen isDevelopment DeveloperExceptionPageExtensions.UseDeveloperExceptionPage
+
+        plugBeforeRoutingWhenNot isDevelopment (fun app -> ExceptionHandlerExtensions.UseExceptionHandler(app, "/error", true))
+
+        useAuthentication (fun auth -> auth.AddCookie(fun options -> options.Cookie.Name <- "TicTacToe.User"; options.Cookie.HttpOnly <- true; options.Cookie.SameSite <- SameSiteMode.Strict; options.Cookie.SecurePolicy <- CookieSecurePolicy.SameAsRequest; options.ExpireTimeSpan <- TimeSpan.FromDays(30.0); options.SlidingExpiration <- true; options.LoginPath <- "/login"))
+
+        useAuthorization
 
         plugBeforeRouting ResponseCompressionBuilderExtensions.UseResponseCompression
         plugBeforeRouting StaticFileExtensions.UseStaticFiles
-        plugBeforeRouting AuthAppBuilderExtensions.UseAuthentication
-        plugBeforeRouting AuthorizationAppBuilderExtensions.UseAuthorization
         plugBeforeRouting AntiforgeryApplicationBuilderExtensions.UseAntiforgery
         plugBeforeRouting createInitialGames
 

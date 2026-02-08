@@ -94,9 +94,10 @@ The Engine library (`src/TicTacToe.Engine/`) is considered **stable and complete
 This section documents the approved technology choices for the project.
 
 **Language**: F# targeting .NET 10.0
-**Web Framework**: ASP.NET Core with Frank.Builder routing
-**View Rendering**: Oxpecker for HTML generation
-**Hypermedia**: StarFederation.Datastar for server-sent events and data binding
+**Web Framework**: ASP.NET Core with Frank 7.1.0 (Frank.Builder routing)
+**Authentication**: Frank.Auth 7.1.0 (declarative `requireAuth` resource authorization)
+**View Rendering**: Oxpecker.ViewEngine 2.x for HTML generation (streaming via `Render.toTextWriterAsync` / `Render.toStreamAsync`)
+**Hypermedia**: Frank.Datastar 7.1.0 for server-sent events and data binding (streaming via `streamPatchElements`)
 **State Management**: MailboxProcessor for concurrent state
 **Unit Testing**: Expecto
 **Web Testing**: Playwright with NUnit

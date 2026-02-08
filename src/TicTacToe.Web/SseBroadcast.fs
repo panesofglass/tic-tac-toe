@@ -1,16 +1,17 @@
 module TicTacToe.Web.SseBroadcast
 
 open System
+open System.IO
 open System.Collections.Concurrent
 open System.Threading.Channels
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Frank.Datastar
-open StarFederation.Datastar.FSharp
 
 /// SSE event types for broadcasting to connected clients
 type SseEvent =
-    | PatchElements of html: string
-    | PatchElementsAppend of selector: string * html: string
+    | PatchElements of render: (TextWriter -> Task)
+    | PatchElementsAppend of selector: string * render: (TextWriter -> Task)
     | RemoveElement of selector: string
     | PatchSignals of json: string
 
@@ -54,10 +55,10 @@ let broadcastPerRole (renderForRole: string -> SseEvent) =
 let writeSseEvent (ctx: HttpContext) (event: SseEvent) =
     task {
         match event with
-        | PatchElements html -> do! Datastar.patchElements html ctx
-        | PatchElementsAppend(selector, html) ->
+        | PatchElements render -> do! Datastar.streamPatchElements render ctx
+        | PatchElementsAppend(selector, render) ->
             let opts = { PatchElementsOptions.Defaults with Selector = ValueSome (Selector selector); PatchMode = ElementPatchMode.Append }
-            do! Datastar.patchElementsWithOptions opts html ctx
+            do! Datastar.streamPatchElementsWithOptions opts render ctx
         | RemoveElement selector -> do! Datastar.removeElement selector ctx
         | PatchSignals json -> do! Datastar.patchSignals json ctx
     }

@@ -14,3 +14,14 @@
 # MSTest test Results
 [Tt]est[Rr]esult*/
 
+# .NET/F# essentials
+*.log
+.env*
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
+packages/
+BenchmarkDotNet.Artifacts/

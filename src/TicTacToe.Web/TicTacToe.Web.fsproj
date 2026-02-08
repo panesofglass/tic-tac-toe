@@ -24,9 +24,10 @@
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="10.0.102" />
-    <PackageReference Include="Frank" Version="6.5.0" />
-    <PackageReference Include="Frank.Datastar" Version="6.5.0" />
-    <PackageReference Include="Oxpecker.ViewEngine" Version="1.1.0" />
+    <PackageReference Include="Frank" Version="7.1.0" />
+    <PackageReference Include="Frank.Datastar" Version="7.1.0" />
+    <PackageReference Include="Frank.Auth" Version="7.1.0" />
+    <PackageReference Include="Oxpecker.ViewEngine" Version="2.*" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 module TicTacToe.Web.Handlers
 
 open System
+open System.IO
 open System.Threading.Channels
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Authentication
@@ -15,7 +16,6 @@ open TicTacToe.Web.templates.game
 open TicTacToe.Engine
 open TicTacToe.Model
 open TicTacToe.Web.Model
-open StarFederation.Datastar.FSharp
 
 /// Signals type for move data from Datastar
 [<CLIMutable>]
@@ -23,19 +23,6 @@ type MoveSignals =
     { gameId: string
       player: string
       position: string }
-
-/// Helper to wrap handlers that require authentication.
-/// Checks for valid auth cookie and redirects to /login if not present.
-let requiresAuth (handler: HttpContext -> Task<unit>) (ctx: HttpContext) : Task<unit> =
-    task {
-        // Check if the user has a valid auth cookie (not just claims from transformation)
-        let! authResult = ctx.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme)
-        if authResult.Succeeded then
-            do! handler ctx
-        else
-            // Issue challenge - will redirect to /login due to LoginPath setting
-            do! ctx.ChallengeAsync()
-    }
 
 // Active game subscriptions - maps gameId to subscription disposable
 let private gameSubscriptions =
@@ -52,8 +39,8 @@ let subscribeToGame (gameId: string) (game: Game) (assignmentManager: PlayerAssi
                         let assignment = assignmentManager.GetAssignment(gameId)
                         let gameCount = supervisor.GetActiveGameCount()
                         let renderForRole userId =
-                            let html = renderGameBoard gameId result userId assignment gameCount |> Render.toString
-                            PatchElements html
+                            let element = renderGameBoard gameId result userId assignment gameCount
+                            PatchElements (fun tw -> Render.toTextWriterAsync tw element)
                         broadcastPerRole renderForRole
 
                     member _.OnError(_) = ()
@@ -134,12 +121,12 @@ let logout (ctx: HttpContext) =
         ctx.Response.Redirect(returnUrl)
     }
 
-/// Home page handler (use with requiresAuth wrapper)
+/// Home page handler
 let home (ctx: HttpContext) =
     task {
-        let html = templates.home.homePage ctx |> layout.html ctx |> Render.toString
+        let element = templates.home.homePage ctx |> layout.html ctx
         ctx.Response.ContentType <- "text/html; charset=utf-8"
-        do! ctx.Response.WriteAsync(html)
+        do! Render.toStreamAsync ctx.Response.Body element
     }
 
 /// SSE endpoint - sends game state updates to all connected clients
@@ -152,7 +139,7 @@ let sse (ctx: HttpContext) =
 
         try
             // Clear loading state when client connects
-            do! Datastar.patchElements """<div id="games-container" class="games-container"></div>""" ctx
+            do! Datastar.streamPatchElements (fun tw -> tw.WriteAsync("""<div id="games-container" class="games-container"></div>""")) ctx
 
             // Send all existing games to the connecting client, personalized to their role
             let gameCount = supervisor.GetActiveGameCount()
@@ -161,9 +148,9 @@ let sse (ctx: HttpContext) =
                 | Some game ->
                     let state = game.GetState()
                     let assignment = assignmentManager.GetAssignment(gameId)
-                    let html = renderGameBoard gameId state userId assignment gameCount |> Render.toString
+                    let element = renderGameBoard gameId state userId assignment gameCount
                     let opts = { PatchElementsOptions.Defaults with Selector = ValueSome (Selector "#games-container"); PatchMode = ElementPatchMode.Append }
-                    do! Datastar.patchElementsWithOptions opts html ctx
+                    do! Datastar.streamPatchElementsWithOptions opts (fun tw -> Render.toTextWriterAsync tw element) ctx
                 | None -> ()
 
             // Keep connection open, forwarding all broadcast events
@@ -199,8 +186,8 @@ let createGame (ctx: HttpContext) =
                 { new IObserver<MoveResult> with
                     member _.OnNext(result) =
                         let gameCount = supervisor.GetActiveGameCount()
-                        let html = renderGameBoard gameId result "" None gameCount |> Render.toString
-                        broadcast (PatchElementsAppend("#games-container", html))
+                        let element = renderGameBoard gameId result "" None gameCount
+                        broadcast (PatchElementsAppend("#games-container", fun tw -> Render.toTextWriterAsync tw element))
 
                     member _.OnError(_) = ()
                     member _.OnCompleted() = () }
@@ -239,10 +226,9 @@ let getGame (ctx: HttpContext) =
                 let userId = ctx.User.TryGetUserId() |> Option.defaultValue "anonymous"
                 let assignment = assignmentManager.GetAssignment(gameId)
                 let gameCount = supervisor.GetActiveGameCount()
-                let gameHtml = renderGameBoard gameId result userId assignment gameCount
-                let html = gameHtml |> layout.html ctx |> Render.toString
+                let element = renderGameBoard gameId result userId assignment gameCount |> layout.html ctx
                 ctx.Response.ContentType <- "text/html; charset=utf-8"
-                do! ctx.Response.WriteAsync(html)
+                do! Render.toStreamAsync ctx.Response.Body element
             | None -> ctx.Response.StatusCode <- 500
         | None -> ctx.Response.StatusCode <- 404
     }
@@ -388,8 +374,8 @@ let resetGame (ctx: HttpContext) =
                             { new IObserver<MoveResult> with
                                 member _.OnNext(result) =
                                     let gameCount = supervisor.GetActiveGameCount()
-                                    let html = renderGameBoard newGameId result "" None gameCount |> Render.toString
-                                    broadcast (PatchElementsAppend("#games-container", html))
+                                    let element = renderGameBoard newGameId result "" None gameCount
+                                    broadcast (PatchElementsAppend("#games-container", fun tw -> Render.toTextWriterAsync tw element))
 
                                 member _.OnError(_) = ()
                                 member _.OnCompleted() = () }

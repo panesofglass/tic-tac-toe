@@ -40,6 +40,18 @@ dotnet run --project src/TicTacToe.Web/
 4. Take turns - X plays first, then O
 5. The first player to get three in a row wins!
 
+## Statechart
+
+The application's behavior is modeled as three orthogonal parallel state machines:
+
+- **Game Play** — Turn-by-turn progression (XTurn, OTurn, Won, Draw) with transient MoveError recovery via history
+- **Player Identity** — Role assignment tracking (Unassigned → XOnlyAssigned/OOnlyAssigned → BothAssigned)
+- **Game Session** — Lifecycle management (Active → Disposed via disposal, reset, or timeout)
+
+![Tic-Tac-Toe Statechart](docs/statechart.svg)
+
+The full SCXML source with data model and guard expressions is at [`docs/statechart.scxml`](docs/statechart.scxml).
+
 ## Architecture
 
 This project demonstrates modern hypermedia-driven architecture using F# and Datastar, with a focus on server-side rendering and real-time updates via SSE.

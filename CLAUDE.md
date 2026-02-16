@@ -8,6 +8,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-02
 - F# targeting .NET 10.0 + Frank 6.5.0, Frank.Datastar 6.5.0, Oxpecker.ViewEngine 1.1.0 (008-user-affordances)
 - In-memory via MailboxProcessor (GameSupervisor, PlayerAssignmentManager) (008-user-affordances)
 - F# targeting .NET 10.0 + Frank 7.1.0, Frank.Datastar 7.1.0, Frank.Auth 7.1.0, Oxpecker.ViewEngine 2.* (001-frank-upgrade)
+- XML (SCXML W3C Recommendation, version 1.0) with ECMAScript data model + smcat 14.0.5 (locally installed) for SCXML → SVG conversion (009-extract-scxml)
+- N/A (documentation artifact, no runtime state) (009-extract-scxml)
 
 - F# targeting .NET 10.0 + Frank 6.4.0, Frank.Datastar 6.4.0, Oxpecker.ViewEngine 1.1.0, System.Reactive 6.0.2 (002-multi-game-rest-api)
 - In-memory via MailboxProcessor (existing GameSupervisor pattern) (002-multi-game-rest-api)
@@ -43,9 +45,9 @@ dotnet test test/TicTacToe.Web.Tests/
 F# targeting .NET 10.0 (per existing project): Follow standard conventions
 
 ## Recent Changes
+- 009-extract-scxml: Added XML (SCXML W3C Recommendation, version 1.0) with ECMAScript data model + smcat 14.0.5 (locally installed) for SCXML → SVG conversion
 - 001-frank-upgrade: Added F# targeting .NET 10.0 + Frank 7.1.0, Frank.Datastar 7.1.0, Frank.Auth 7.1.0, Oxpecker.ViewEngine 2.*
 - 008-user-affordances: Added F# targeting .NET 10.0 + Frank 6.5.0, Frank.Datastar 6.5.0, Oxpecker.ViewEngine 1.1.0
-- 007-player-identity-legend: Added F# targeting .NET 10.0 + Frank 6.4.0, Frank.Datastar 6.4.0, Oxpecker.ViewEngine 1.1.0
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -1,0 +1,6 @@
+initial,
+AwaitingLogin,
+Authenticated [type=final];
+
+initial => AwaitingLogin;
+AwaitingLogin => Authenticated: login;

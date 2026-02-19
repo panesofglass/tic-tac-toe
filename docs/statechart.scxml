@@ -1,133 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" initial="TicTacToe">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" initial="Unauthenticated">
 
-  <datamodel>
-    <data id="board" expr="{
-      TopLeft: 'Empty', TopCenter: 'Empty', TopRight: 'Empty',
-      MiddleLeft: 'Empty', MiddleCenter: 'Empty', MiddleRight: 'Empty',
-      BottomLeft: 'Empty', BottomCenter: 'Empty', BottomRight: 'Empty'
-    }"/>
-    <data id="playerXId" expr="null"/>
-    <data id="playerOId" expr="null"/>
-    <data id="gameCount" expr="6"/>
-    <data id="winner" expr="null"/>
-  </datamodel>
+  <!--
+    TicTacToe Application Statechart
 
-  <parallel id="TicTacToe">
+    Models the user journey as a sequential flow:
+      1. Authenticate (child state machine: auth.scxml)
+      2. Browse available game boards
+      3. Participate in games (child state machine: game.scxml)
 
-    <!-- Region 1: Game Play -->
-    <state id="GamePlay" initial="XTurn">
+    Auth and Game are invoked as child state machines.
+    Multiple game instances may be active concurrently.
+  -->
 
-      <history id="GamePlayHistory" type="shallow">
-        <transition target="XTurn"/>
-      </history>
+  <state id="Unauthenticated">
+    <invoke type="scxml" src="auth.scxml" id="AuthFlow"/>
+    <transition event="done.invoke.AuthFlow" target="Browsing"/>
+  </state>
 
-      <state id="XTurn">
-        <!-- Win: X completes a winning line -->
-        <transition event="move.x" target="Won"
-                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldWin('X', _event.data.position)">
-          <assign location="board[_event.data.position]" expr="'X'"/>
-          <assign location="winner" expr="'X'"/>
-        </transition>
-        <!-- Draw: X fills the last square with no winner -->
-        <transition event="move.x" target="Draw"
-                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldFillBoard(_event.data.position)">
-          <assign location="board[_event.data.position]" expr="'X'"/>
-        </transition>
-        <!-- Continue: valid move, game continues -->
-        <transition event="move.x" target="OTurn"
-                    cond="board[_event.data.position] === 'Empty'">
-          <assign location="board[_event.data.position]" expr="'X'"/>
-        </transition>
-        <!-- Error: invalid move (wrong player, taken square) -->
-        <transition event="move" target="MoveError"/>
-      </state>
-
-      <state id="OTurn">
-        <!-- Win: O completes a winning line -->
-        <transition event="move.o" target="Won"
-                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldWin('O', _event.data.position)">
-          <assign location="board[_event.data.position]" expr="'O'"/>
-          <assign location="winner" expr="'O'"/>
-        </transition>
-        <!-- Draw: O fills the last square with no winner -->
-        <transition event="move.o" target="Draw"
-                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldFillBoard(_event.data.position)">
-          <assign location="board[_event.data.position]" expr="'O'"/>
-        </transition>
-        <!-- Continue: valid move, game continues -->
-        <transition event="move.o" target="XTurn"
-                    cond="board[_event.data.position] === 'Empty'">
-          <assign location="board[_event.data.position]" expr="'O'"/>
-        </transition>
-        <!-- Error: invalid move (wrong player, taken square) -->
-        <transition event="move" target="MoveError"/>
-      </state>
-
-      <!-- Transient error: returns to previous turn state via history -->
-      <state id="MoveError">
-        <transition target="GamePlayHistory"/>
-      </state>
-
-      <final id="Won"/>
-      <final id="Draw"/>
-
-    </state>
-
-    <!-- Region 2: Player Identity -->
-    <state id="PlayerIdentity" initial="Unassigned">
-
-      <state id="Unassigned">
-        <!-- First X move assigns player X -->
-        <transition event="move.x" target="XOnlyAssigned"
-                    cond="playerXId === null">
-          <assign location="playerXId" expr="_event.data.userId"/>
-        </transition>
-        <!-- First O move assigns player O -->
-        <transition event="move.o" target="OOnlyAssigned"
-                    cond="playerOId === null">
-          <assign location="playerOId" expr="_event.data.userId"/>
-        </transition>
-      </state>
-
-      <state id="XOnlyAssigned">
-        <!-- Different user claims O -->
-        <transition event="move.o" target="BothAssigned"
-                    cond="_event.data.userId !== playerXId &amp;&amp; playerOId === null">
-          <assign location="playerOId" expr="_event.data.userId"/>
-        </transition>
-      </state>
-
-      <state id="OOnlyAssigned">
-        <!-- Different user claims X -->
-        <transition event="move.x" target="BothAssigned"
-                    cond="_event.data.userId !== playerOId &amp;&amp; playerXId === null">
-          <assign location="playerXId" expr="_event.data.userId"/>
-        </transition>
-      </state>
-
-      <state id="BothAssigned"/>
-
-    </state>
-
-    <!-- Region 3: Game Session Lifecycle -->
-    <state id="GameSession" initial="Active">
-
-      <state id="Active">
-        <!-- Disposal: participant or surplus games -->
-        <transition event="game.dispose" target="Disposed"
-                    cond="isParticipant(_event.data.userId) || gameCount > 6"/>
-        <!-- Reset: participant with activity disposes current session -->
-        <transition event="game.reset" target="Disposed"
-                    cond="isParticipant(_event.data.userId) &amp;&amp; hasActivity()"/>
-        <!-- Timeout: unconditional cleanup -->
-        <transition event="game.timeout" target="Disposed"/>
-      </state>
-
-      <final id="Disposed"/>
-
-    </state>
-
-  </parallel>
+  <state id="Browsing">
+    <!--
+      User sees available game boards and may participate in games.
+      Each game is an independent child state machine (game.scxml);
+      multiple game instances may be active concurrently.
+    -->
+    <invoke type="scxml" src="game.scxml" id="GameInstance" autoforward="true"/>
+    <transition event="logout" target="Unauthenticated"/>
+  </state>
 
 </scxml>

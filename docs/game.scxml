@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" initial="Playing">
+
+  <!--
+    Game Child State Machine (single game instance)
+    Models a single tic-tac-toe game from creation to disposal.
+    Multiple instances may run concurrently, one per game board.
+    Invoked from the main statechart (statechart.scxml).
+
+    The Playing state contains two orthogonal regions:
+      - GamePlay: turn-by-turn game progression
+      - PlayerIdentity: player role assignment
+
+    Lifecycle events (dispose, reset, timeout) exit the entire game.
+  -->
+
+  <datamodel>
+    <data id="board" expr="{
+      TopLeft: 'Empty', TopCenter: 'Empty', TopRight: 'Empty',
+      MiddleLeft: 'Empty', MiddleCenter: 'Empty', MiddleRight: 'Empty',
+      BottomLeft: 'Empty', BottomCenter: 'Empty', BottomRight: 'Empty'
+    }"/>
+    <data id="playerXId" expr="null"/>
+    <data id="playerOId" expr="null"/>
+    <data id="gameCount" expr="6"/>
+    <data id="winner" expr="null"/>
+  </datamodel>
+
+  <parallel id="Playing">
+
+    <!-- Region 1: Turn-by-turn game progression -->
+    <state id="GamePlay" initial="XTurn">
+
+      <history id="GamePlayHistory" type="shallow">
+        <transition target="XTurn"/>
+      </history>
+
+      <state id="XTurn">
+        <!-- Win: X completes a winning line -->
+        <transition event="move.x" target="Won"
+                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldWin('X', _event.data.position)">
+          <assign location="board[_event.data.position]" expr="'X'"/>
+          <assign location="winner" expr="'X'"/>
+        </transition>
+        <!-- Draw: X fills the last square with no winner -->
+        <transition event="move.x" target="Draw"
+                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldFillBoard(_event.data.position)">
+          <assign location="board[_event.data.position]" expr="'X'"/>
+        </transition>
+        <!-- Continue: valid move, game continues -->
+        <transition event="move.x" target="OTurn"
+                    cond="board[_event.data.position] === 'Empty'">
+          <assign location="board[_event.data.position]" expr="'X'"/>
+        </transition>
+        <!-- Error: invalid move (wrong player, taken square) -->
+        <transition event="move" target="MoveError"/>
+      </state>
+
+      <state id="OTurn">
+        <!-- Win: O completes a winning line -->
+        <transition event="move.o" target="Won"
+                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldWin('O', _event.data.position)">
+          <assign location="board[_event.data.position]" expr="'O'"/>
+          <assign location="winner" expr="'O'"/>
+        </transition>
+        <!-- Draw: O fills the last square with no winner -->
+        <transition event="move.o" target="Draw"
+                    cond="board[_event.data.position] === 'Empty' &amp;&amp; wouldFillBoard(_event.data.position)">
+          <assign location="board[_event.data.position]" expr="'O'"/>
+        </transition>
+        <!-- Continue: valid move, game continues -->
+        <transition event="move.o" target="XTurn"
+                    cond="board[_event.data.position] === 'Empty'">
+          <assign location="board[_event.data.position]" expr="'O'"/>
+        </transition>
+        <!-- Error: invalid move (wrong player, taken square) -->
+        <transition event="move" target="MoveError"/>
+      </state>
+
+      <!-- Transient error: returns to previous turn state via history -->
+      <state id="MoveError">
+        <transition target="GamePlayHistory"/>
+      </state>
+
+      <final id="Won"/>
+      <final id="Draw"/>
+
+    </state>
+
+    <!-- Region 2: Player role assignment -->
+    <state id="PlayerIdentity" initial="Unassigned">
+
+      <state id="Unassigned">
+        <!-- First X move assigns player X -->
+        <transition event="move.x" target="XOnlyAssigned"
+                    cond="playerXId === null">
+          <assign location="playerXId" expr="_event.data.userId"/>
+        </transition>
+        <!-- First O move assigns player O -->
+        <transition event="move.o" target="OOnlyAssigned"
+                    cond="playerOId === null">
+          <assign location="playerOId" expr="_event.data.userId"/>
+        </transition>
+      </state>
+
+      <state id="XOnlyAssigned">
+        <!-- Different user claims O -->
+        <transition event="move.o" target="BothAssigned"
+                    cond="_event.data.userId !== playerXId &amp;&amp; playerOId === null">
+          <assign location="playerOId" expr="_event.data.userId"/>
+        </transition>
+      </state>
+
+      <state id="OOnlyAssigned">
+        <!-- Different user claims X -->
+        <transition event="move.x" target="BothAssigned"
+                    cond="_event.data.userId !== playerOId &amp;&amp; playerXId === null">
+          <assign location="playerXId" expr="_event.data.userId"/>
+        </transition>
+      </state>
+
+      <state id="BothAssigned"/>
+
+    </state>
+
+    <!-- Lifecycle transitions: exit the entire game from any active sub-state -->
+    <transition event="game.dispose" target="Disposed"
+                cond="isParticipant(_event.data.userId) || gameCount &gt; 6"/>
+    <transition event="game.reset" target="Disposed"
+                cond="isParticipant(_event.data.userId) &amp;&amp; hasActivity()"/>
+    <transition event="game.timeout" target="Disposed"/>
+
+  </parallel>
+
+  <final id="Disposed"/>
+
+</scxml>

@@ -1,43 +1,7 @@
 initial,
-TicTacToe [type=parallel] {
-  GamePlay {
-    GamePlayHistory [type=history],
-    XTurn,
-    OTurn,
-    MoveError,
-    Won [type=final],
-    Draw [type=final];
+Unauthenticated,
+Browsing;
 
-    GamePlayHistory => XTurn: (default);
-    XTurn => Won: move.x [valid & wins];
-    XTurn => Draw: move.x [valid & fills board];
-    XTurn => OTurn: move.x [valid];
-    XTurn => MoveError: move [invalid];
-    OTurn => Won: move.o [valid & wins];
-    OTurn => Draw: move.o [valid & fills board];
-    OTurn => XTurn: move.o [valid];
-    OTurn => MoveError: move [invalid];
-    MoveError => GamePlayHistory;
-  },
-  PlayerIdentity {
-    Unassigned,
-    XOnlyAssigned,
-    OOnlyAssigned,
-    BothAssigned;
-
-    Unassigned => XOnlyAssigned: move.x [no X assigned];
-    Unassigned => OOnlyAssigned: move.o [no O assigned];
-    XOnlyAssigned => BothAssigned: move.o [different user];
-    OOnlyAssigned => BothAssigned: move.x [different user];
-  },
-  GameSession {
-    Active,
-    Disposed [type=final];
-
-    Active => Disposed: game.dispose [participant or count > 6];
-    Active => Disposed: game.reset [participant & has activity];
-    Active => Disposed: game.timeout;
-  };
-};
-
-initial => TicTacToe;
+initial => Unauthenticated;
+Unauthenticated => Browsing: authenticated;
+Browsing => Unauthenticated: logout;

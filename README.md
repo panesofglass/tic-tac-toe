@@ -42,15 +42,24 @@ dotnet run --project src/TicTacToe.Web/
 
 ## Statechart
 
-The application's behavior is modeled as three orthogonal parallel state machines:
+The application's behavior is modeled as a sequential flow with child state machines:
 
-- **Game Play** — Turn-by-turn progression (XTurn, OTurn, Won, Draw) with transient MoveError recovery via history
-- **Player Identity** — Role assignment tracking (Unassigned → XOnlyAssigned/OOnlyAssigned → BothAssigned)
-- **Game Session** — Lifecycle management (Active → Disposed via disposal, reset, or timeout)
+![Application Flow](docs/statechart.svg)
 
-![Tic-Tac-Toe Statechart](docs/statechart.svg)
+1. **Authentication** ([`auth.scxml`](docs/auth.scxml)) — Cookie-based login, invoked as a child state machine
 
-The full SCXML source with data model and guard expressions is at [`docs/statechart.scxml`](docs/statechart.scxml).
+   ![Auth Flow](docs/auth.svg)
+
+2. **Browsing** — User sees available game boards; multiple game instances may be active concurrently
+
+3. **Game** ([`game.scxml`](docs/game.scxml)) — Each game is an independent child state machine with two orthogonal regions:
+   - **Game Play** — Turn-by-turn progression (XTurn, OTurn, Won, Draw) with transient MoveError recovery via history
+   - **Player Identity** — Role assignment tracking (Unassigned → XOnlyAssigned/OOnlyAssigned → BothAssigned)
+   - Lifecycle events (dispose, reset, timeout) exit the entire game
+
+   ![Game Flow](docs/game.svg)
+
+The main SCXML source is at [`docs/statechart.scxml`](docs/statechart.scxml).
 
 ## Architecture
 

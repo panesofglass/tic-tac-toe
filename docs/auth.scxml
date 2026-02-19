@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="ecmascript" initial="AwaitingLogin">
+
+  <!--
+    Authentication Child State Machine
+    Models cookie-based authentication.
+    Invoked from the main statechart (statechart.scxml).
+  -->
+
+  <state id="AwaitingLogin">
+    <transition event="login" target="Authenticated"/>
+  </state>
+
+  <final id="Authenticated"/>
+
+</scxml>
